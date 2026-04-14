@@ -786,7 +786,7 @@ export default function ChatScreen() {
       if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
       if (audioRef.current) {
         audioRef.current.pause();
-        audioRef.current.oncanplaythrough = null;
+        audioRef.current.oncanplay = null;
         audioRef.current.onended = null;
         audioRef.current.onerror = null;
         audioRef.current.src = '';
@@ -812,7 +812,7 @@ export default function ChatScreen() {
       const audio = audioRef.current;
       audioRef.current = null;
       audio.pause();
-      audio.oncanplaythrough = null;
+      audio.oncanplay = null;
       audio.onended = null;
       audio.onerror = null;
       audio.src = '';
@@ -832,7 +832,7 @@ export default function ChatScreen() {
       const old = audioRef.current;
       audioRef.current = null;
       old.pause();
-      old.oncanplaythrough = null;
+      old.oncanplay = null;
       old.onended = null;
       old.onerror = null;
       old.src = '';
@@ -858,11 +858,6 @@ export default function ChatScreen() {
     const audio = new Audio();
     audioRef.current = audio;
 
-    // Set src BEFORE any event handlers, then load explicitly
-    audio.preload = 'auto';
-    audio.src = audioUrl;
-    audio.load();
-
     // ─── RAF progress tracking ───
     const updateProgress = () => {
       if (!audioRef.current || playingVoiceIdRef.current !== msgId) return;
@@ -879,13 +874,38 @@ export default function ChatScreen() {
       rafRef.current = requestAnimationFrame(updateProgress);
     };
 
-    // ─── Audio event handlers ───
-    audio.oncanplaythrough = () => {
+    // ─── Audio event handlers — MUST be attached BEFORE setting src ───
+    // For data URLs, the browser loads instantly, so events fire immediately.
+    // If we set src first, oncanplay fires before we attach the listener.
+
+    const cleanupAudio = () => {
+      audio.oncanplay = null;
+      audio.onended = null;
+      audio.onerror = null;
+    };
+
+    audio.onended = () => {
       if (playingVoiceIdRef.current !== msgId) return;
-      const dur = audio.duration;
-      if (dur && isFinite(dur) && !isNaN(dur)) {
-        setVoicePlayback(prev => prev.playingId === msgId ? { ...prev, duration: dur, status: 'loading' } : prev);
-      }
+      stopRaf();
+      cleanupAudio();
+      if (audioRef.current === audio) audioRef.current = null;
+      playingVoiceIdRef.current = null;
+      setVoicePlayback({ playingId: null, progress: 0, currentTime: 0, duration: 0, status: 'idle' });
+    };
+
+    audio.onerror = () => {
+      if (playingVoiceIdRef.current !== msgId) return;
+      console.error('[Voice] Audio error:', audio.error?.code, audio.error?.message);
+      stopRaf();
+      cleanupAudio();
+      setVoicePlayback(prev => prev.playingId === msgId ? { ...prev, status: 'error' } : prev);
+    };
+
+    // Use canplay (not canplaythrough) — fires as soon as enough data is available.
+    // For data URLs this fires almost immediately, which is what we want.
+    audio.oncanplay = () => {
+      if (playingVoiceIdRef.current !== msgId) return;
+      console.log('[Voice] canplay fired, duration:', audio.duration);
       audio.play().then(() => {
         if (playingVoiceIdRef.current !== msgId) return;
         setVoicePlayback(prev => prev.playingId === msgId ? { ...prev, status: 'playing' } : prev);
@@ -898,27 +918,9 @@ export default function ChatScreen() {
       });
     };
 
-    audio.onended = () => {
-      if (playingVoiceIdRef.current !== msgId) return;
-      stopRaf();
-      if (audioRef.current === audio) audioRef.current = null;
-      audio.oncanplaythrough = null;
-      audio.onended = null;
-      audio.onerror = null;
-      playingVoiceIdRef.current = null;
-      setVoicePlayback({ playingId: null, progress: 0, currentTime: 0, duration: 0, status: 'idle' });
-    };
-
-    audio.onerror = () => {
-      if (playingVoiceIdRef.current !== msgId) return;
-      console.error('[Voice] Error:', audio.error?.code, audio.error?.message);
-      stopRaf();
-      if (audioRef.current === audio) audioRef.current = null;
-      audio.oncanplaythrough = null;
-      audio.onended = null;
-      audio.onerror = null;
-      setVoicePlayback(prev => prev.playingId === msgId ? { ...prev, status: 'error' } : prev);
-    };
+    // NOW set src — events are already listening
+    audio.preload = 'auto';
+    audio.src = audioUrl;
   }, [stopVoicePlayback, stopRaf]);
 
   // ─── Message handlers ───

@@ -54,6 +54,7 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const recordingStartTimeRef = useRef<number>(0);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   // Image preview
   const [pendingImage, setPendingImage] = useState<File | null>(null);
@@ -171,14 +172,22 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
         : { audioBitsPerSecond: 128000 };
       const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      // Collect chunks as they arrive (every 200ms + final on stop)
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
 
       mediaRecorder.onerror = (e) => {
         console.error('[Voice] MediaRecorder error:', e);
         cancelRecording();
       };
 
-      // timeslice=0 → ondataavailable fires ONLY when stop() is called
-      mediaRecorder.start(0);
+      // Collect data every 200ms to ensure chunks are available
+      mediaRecorder.start(200);
       recordingStartTimeRef.current = Date.now();
       recordingTimeRef.current = 0;
       setRecordingTime(0);
@@ -224,19 +233,12 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
     // Show processing state
     setIsProcessing(true);
 
-    // Promise-based: resolve the single blob from ondataavailable (fires once with timeslice=0)
-    const blobPromise = new Promise<Blob>((resolve, reject) => {
-      recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) {
-          resolve(e.data);
-        }
-      };
-      recorder.onerror = () => reject(new Error('MediaRecorder error'));
-    });
-
-    try {
-      recorder.stop(); // triggers ondataavailable with all data (timeslice was 0)
-      const blob = await blobPromise;
+    // When stop() fires: one last ondataavailable, THEN onstop.
+    // We create the blob inside onstop to capture ALL chunks including the final one.
+    recorder.onstop = async () => {
+      // Now ALL chunks have been collected
+      const allChunks = [...audioChunksRef.current];
+      audioChunksRef.current = [];
 
       // Stop media stream
       if (stream) { stream.getTracks().forEach((t) => t.stop()); mediaStreamRef.current = null; }
@@ -250,6 +252,10 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
         return;
       }
 
+      // Create blob from ALL collected chunks
+      const blob = new Blob(allChunks, { type: recorder.mimeType || 'audio/webm' });
+      console.log('[Voice] Blob created, size:', blob.size, 'type:', blob.type, 'chunks:', allChunks.length);
+
       if (blob.size < 100) {
         console.warn('[Voice] Blob too small, discarding');
         setIsProcessing(false);
@@ -257,22 +263,30 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
         return;
       }
 
-      console.log('[Voice] Blob created, size:', blob.size, 'type:', blob.type);
+      try {
+        // Convert to data URL
+        const dataUrl = await blobToDataUrl(blob);
 
-      // Convert to data URL
-      const dataUrl = await blobToDataUrl(blob);
+        const mins = Math.floor(elapsed / 60);
+        const secs = elapsed % 60;
+        const duration = `${mins}:${secs.toString().padStart(2, '0')}`;
+        const content = `${duration}|${dataUrl}`;
+        console.log('[Voice] Sending voice, duration:', duration, 'dataUrl length:', dataUrl.length);
+        onSendVoiceRef.current(content);
+      } catch (err) {
+        console.error('[Voice] Data URL conversion failed:', err);
+      } finally {
+        setIsProcessing(false);
+        setRecordingTime(0);
+      }
+    };
 
-      const mins = Math.floor(elapsed / 60);
-      const secs = elapsed % 60;
-      const duration = `${mins}:${secs.toString().padStart(2, '0')}`;
-      const content = `${duration}|${dataUrl}`;
-      console.log('[Voice] Sending voice, duration:', duration, 'size:', blob.size);
-      onSendVoiceRef.current(content);
-    } catch (err) {
-      console.error('[Voice] Processing failed:', err);
+    try {
+      recorder.stop();
+    } catch {
+      console.error('[Voice] recorder.stop() threw');
       if (stream) { stream.getTracks().forEach((t) => t.stop()); mediaStreamRef.current = null; }
       mediaRecorderRef.current = null;
-    } finally {
       setIsProcessing(false);
       setRecordingTime(0);
     }
