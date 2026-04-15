@@ -7,7 +7,7 @@ import { useKinzolaStore } from '@/store/use-kinzola-store';
 import { AVAILABLE_CITIES, AVAILABLE_RELIGIONS, AVAILABLE_INTERESTS, MOCK_PROFILES } from '@/lib/mock-data';
 
 export default function FilterPanel() {
-  const { filters, applyFilters, resetFilters, setShowFilters, swipedProfileIds } = useKinzolaStore();
+  const { filters, applyFilters, resetFilters, setShowFilters } = useKinzolaStore();
   const [localFilters, setLocalFilters] = useState(filters);
   const [selectedCities, setSelectedCities] = useState<string[]>(filters.cities);
   const [selectedReligions, setSelectedReligions] = useState<string[]>(filters.religions);
@@ -20,7 +20,7 @@ export default function FilterPanel() {
 
   // Preview how many profiles will match
   const previewCount = useMemo(() => {
-    let count = MOCK_PROFILES.filter(p => !swipedProfileIds.has(p.id));
+    let count = [...MOCK_PROFILES];
     if (localFilters.gender !== 'tous') count = count.filter(p => p.gender === localFilters.gender);
     if (localFilters.ageMin > 18) count = count.filter(p => p.age >= localFilters.ageMin);
     if (localFilters.ageMax < 99) count = count.filter(p => p.age <= localFilters.ageMax);
