@@ -722,6 +722,7 @@ export default function ChatScreen() {
   const setShowChatContactDetail = useKinzolaStore((s) => s.setShowChatContactDetail);
   const customNicknames = useKinzolaStore((s) => s.customNicknames);
   const blockedUserIds = useKinzolaStore((s) => s.blockedUserIds);
+  const simulateReply = useKinzolaStore((s) => s.simulateReply);
   const unblockUser = useKinzolaStore((s) => s.unblockUser);
 
   // ─── Local state ───
@@ -936,7 +937,9 @@ export default function ChatScreen() {
     } else {
       sendMessage(conversationId, text);
     }
-  }, [conversationId, sendMessage, sendReplyMessage, replyTo]);
+    // Simulate auto-reply from the other person (2-5s delay)
+    simulateReply(conversationId, text);
+  }, [conversationId, sendMessage, sendReplyMessage, replyTo, simulateReply]);
 
   const handleSendVoice = useCallback((content: string) => {
     if (!conversationId) return;

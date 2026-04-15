@@ -215,6 +215,7 @@ interface KinzolaState {
   toggleMessageImportant: (conversationId: string, messageId: string) => void;
   forwardMessageToConversation: (targetConversationId: string, content: string) => void;
   deleteConversation: (conversationId: string) => void;
+  simulateReply: (conversationId: string, sentContent: string) => void;
 
   // Actions - Posts
   createPost: (content: string, imageUrl?: string, visibility?: 'public' | 'friends') => void;
@@ -636,6 +637,85 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
   deleteConversation: (conversationId) => {
     const updatedConversations = get().conversations.filter(c => c.id !== conversationId);
     set({ conversations: updatedConversations, currentChatId: null });
+  },
+
+  // Simulate incoming reply from the other person (mock auto-reply)
+  simulateReply: (conversationId: string, sentContent: string) => {
+    const { conversations, user, blockedUserIds } = get();
+    const conv = conversations.find(c => c.id === conversationId);
+    if (!conv || blockedUserIds.includes(conv.participant.userId)) return;
+
+    // Generate a contextual reply based on what was sent
+    const replies = [
+      'Haha c\'est vrai 😂',
+      'Oh j\'adore ça !',
+      'Tu es très intéressant(e) 🥰',
+      'On se voit quand ?',
+      'Moi aussi je pense la même chose',
+      'Trop bien ! Dis m\'en plus',
+      'Je suis d\'accord avec toi 💯',
+      'C\'est beau ce que tu dis ❤️',
+      'Ah oui ? Et après ?',
+      'Je n\'ai pas encore vu ça, raconte moi',
+      'Tu me fais rire 😄',
+      'C\'est gentil de ta part',
+      'On a beaucoup en commun je trouve',
+      'Je kiffe ta vibe 🙌',
+      'C\'est cool, on devrait en parler plus',
+    ];
+
+    // Pick a reply (try to be contextually relevant sometimes)
+    let replyContent: string;
+    const lower = sentContent.toLowerCase();
+    if (lower.includes('bonjour') || lower.includes('salut') || lower.includes('hey') || lower.includes('yo')) {
+      replyContent = 'Salut ! Comment tu vas ? 😊';
+    } else if (lower.includes('ça va') || lower.includes('comment') || lower.includes('how')) {
+      replyContent = 'Je vais bien merci ! Et toi ?';
+    } else if (lower.includes('nom') || lower.includes('appell')) {
+      replyContent = `Moi c'est ${conv.participant.name}, enchanté(e) ! 😊`;
+    } else if (lower.includes('match') || lower.includes('plais')) {
+      replyContent = 'Oui je suis content(e) de ce match ! Tu me plais beaucoup ❤️';
+    } else if (lower.includes('photo') || lower.includes('voir') || lower.includes('rencontr')) {
+      replyContent = 'Oui avec plaisir ! On peut se voir un de ces jours 🥰';
+    } else {
+      replyContent = replies[Math.floor(Math.random() * replies.length)];
+    }
+
+    // Delay 2-5 seconds before "replying"
+    const delay = 2000 + Math.random() * 3000;
+    setTimeout(() => {
+      const currentConvs = get().conversations;
+      const updatedConvs = currentConvs.map(c => {
+        if (c.id !== conversationId) return c;
+        const replyMsg: Message = {
+          id: `msg-${Date.now()}`,
+          senderId: c.participant.userId,
+          receiverId: 'user-me',
+          content: replyContent,
+          type: 'text',
+          read: false,
+          timestamp: new Date().toISOString(),
+        };
+        return {
+          ...c,
+          messages: [...c.messages, replyMsg],
+          lastMessage: replyContent,
+          lastMessageTime: 'Maintenant',
+          unreadCount: (c.unreadCount || 0) + 1,
+        };
+      });
+      set({ conversations: updatedConvs });
+
+      // Also add a notification for the incoming message
+      get().addNotification({
+        type: 'message',
+        title: `${conv.participant.name} vous a envoyé un message`,
+        message: replyContent,
+        fromUserId: conv.participant.userId,
+        fromUserName: conv.participant.name,
+        fromUserPhoto: conv.participant.photoUrl,
+      });
+    }, delay);
   },
 
   // Posts Actions

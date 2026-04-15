@@ -19,6 +19,7 @@ import MatchModal from './messages/match-modal';
 import SplashScreen from './splash-screen';
 import NotificationSoundManager from './news/notification-sound-manager';
 import MatchNotificationBanner from './match-notification-banner';
+import { useBrowserNotifications } from '@/hooks/use-browser-notifications';
 
 // ─── Screen slide transition (left/right like mobile navigation) ───
 const screenVariants = {
@@ -63,6 +64,9 @@ export default function AppShell() {
     textSize,
     hydrate,
   } = useKinzolaStore();
+
+  // Browser push notifications (real phone notifications)
+  useBrowserNotifications();
 
   // ✅ Hydration-safe mounted pattern
   // Avant mounted: SSR et client rendent les mêmes valeurs par défaut

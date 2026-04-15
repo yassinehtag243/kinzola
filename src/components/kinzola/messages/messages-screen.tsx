@@ -18,16 +18,16 @@ export default function MessagesScreen() {
 
   // Update client time every 30s for last seen
   useEffect(() => {
-    const id = setInterval(() => setClientNow(new Date()), 30000);
+    const id = setInterval(() => setClientNow(new Date()), 8000);
     return () => clearInterval(id);
   }, []);
 
-  // Tick online status every 30 seconds
+  // Tick online status every 8 seconds
   useEffect(() => {
     const id = setInterval(() => {
       tickOnlineStatus();
       setClientNow(new Date());
-    }, 30000);
+    }, 8000);
     return () => clearInterval(id);
   }, [tickOnlineStatus]);
 
