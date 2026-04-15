@@ -18,6 +18,7 @@ import EditPersonalInfo from './profile/edit-personal-info';
 import MatchModal from './messages/match-modal';
 import SplashScreen from './splash-screen';
 import NotificationSoundManager from './news/notification-sound-manager';
+import MatchNotificationBanner from './match-notification-banner';
 
 // ─── Screen slide transition (left/right like mobile navigation) ───
 const screenVariants = {
@@ -96,6 +97,9 @@ export default function AppShell() {
 
       {/* ─── Global Notification Sound Manager (invisible) ─── */}
       <NotificationSoundManager />
+
+      {/* ─── Match Notification Banner (in-app toast en haut) ─── */}
+      <MatchNotificationBanner />
 
       <AnimatePresence mode="wait">
         {currentScreen === 'welcome' && (
