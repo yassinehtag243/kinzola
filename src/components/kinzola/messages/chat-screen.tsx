@@ -5,6 +5,7 @@ import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import {
   MoreVertical, ArrowLeft, Phone, Video, Flag, Ban, Play, Pause, X, Download,
   Star, Trash2, Reply, Forward, Copy, BookmarkMinus, CheckCheck, Share2, Info, MessageCircle,
+  ShieldOff,
 } from 'lucide-react';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
 import { formatLastSeen } from '@/lib/format-time';
@@ -720,6 +721,8 @@ export default function ChatScreen() {
   const isLight = theme === 'light';
   const setShowChatContactDetail = useKinzolaStore((s) => s.setShowChatContactDetail);
   const customNicknames = useKinzolaStore((s) => s.customNicknames);
+  const blockedUserIds = useKinzolaStore((s) => s.blockedUserIds);
+  const unblockUser = useKinzolaStore((s) => s.unblockUser);
 
   // ─── Local state ───
   const [showMenu, setShowMenu] = useState(false);
@@ -744,6 +747,7 @@ export default function ChatScreen() {
   const online = participant?.online ?? false;
   const displayName = customNicknames[conversationId] || participant.name;
   const lastMsgId = messages.length > 0 ? messages[messages.length - 1].id : '';
+  const isUserBlocked = participant ? blockedUserIds.includes(participant.userId) : false;
 
   // ─── Refs ───
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -1138,7 +1142,7 @@ export default function ChatScreen() {
                 <div className="fixed inset-0 z-[-1]" onClick={() => setShowMenu(false)} />
                 <button onClick={() => setShowMenu(false)} className="w-full flex items-center gap-2 px-4 py-3 text-sm text-orange-400 hover:bg-white/5 transition-colors cursor-pointer"><Flag className="w-4 h-4" /> Signaler</button>
                 <div className="h-px" style={{ background: dividerColor }} />
-                <button onClick={() => setShowMenu(false)} className="w-full flex items-center gap-2 px-4 py-3 text-sm text-orange-400 hover:bg-white/5 transition-colors cursor-pointer"><Ban className="w-4 h-4" /> Bloquer</button>
+                <button onClick={() => { setShowMenu(false); if (participant) useKinzolaStore.getState().blockUser(participant.userId); }} className="w-full flex items-center gap-2 px-4 py-3 text-sm text-orange-400 hover:bg-white/5 transition-colors cursor-pointer"><Ban className="w-4 h-4" /> Bloquer</button>
                 <div className="h-px" style={{ background: dividerColor }} />
                 <button onClick={handleDelete} className="w-full flex items-center gap-2 px-4 py-3 text-sm text-red-400 hover:bg-white/5 transition-colors cursor-pointer"><X className="w-4 h-4" /> Supprimer</button>
               </motion.div>
@@ -1271,8 +1275,41 @@ export default function ChatScreen() {
         )}
       </AnimatePresence>
 
+      {/* ─── Blocked user banner ─── */}
+      <AnimatePresence>
+        {isUserBlocked && (
+          <motion.div
+            key="blocked-banner"
+            initial={{ opacity: 0, y: -10, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: 'auto' }}
+            exit={{ opacity: 0, y: -10, height: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            className="flex items-center justify-between px-4 py-2.5 flex-shrink-0"
+            style={{
+              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(220, 38, 38, 0.1))',
+              borderTop: '1px solid rgba(239, 68, 68, 0.2)',
+            }}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-sm flex-shrink-0">🚫</span>
+              <span className="text-xs font-medium text-red-400 truncate">
+                Vous avez bloqué cet utilisateur
+              </span>
+            </div>
+            <button
+              onClick={() => participant && unblockUser(participant.userId)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white flex-shrink-0 cursor-pointer transition-transform active:scale-[0.97]"
+              style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)' }}
+            >
+              <ShieldOff className="w-3 h-3" />
+              Débloquer
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ─── Input bar ─── */}
-      <ChatInputBar onSendMessage={handleSendMessage} onSendVoice={handleSendVoice} onSendImage={handleSendImage} />
+      {!isUserBlocked && <ChatInputBar onSendMessage={handleSendMessage} onSendVoice={handleSendVoice} onSendImage={handleSendImage} />}
 
       {/* ─── Chat Contact Detail Overlay ─── */}
       <AnimatePresence>

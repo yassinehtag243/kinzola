@@ -9,7 +9,7 @@ import ChatScreen from './chat-screen';
 import OnlineUsersSection from './online-users-section';
 
 export default function MessagesScreen() {
-  const { conversations, matches, openChat, currentChatId, deleteConversation, tickOnlineStatus, theme, customNicknames } = useKinzolaStore();
+  const { conversations, matches, openChat, currentChatId, deleteConversation, tickOnlineStatus, theme, customNicknames, blockedUserIds } = useKinzolaStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [menuConvId, setMenuConvId] = useState<string | null>(null);
   const [clientNow, setClientNow] = useState(() => new Date());
@@ -33,6 +33,8 @@ export default function MessagesScreen() {
 
   const newMatches = matches.filter(m => m.newMatch);
   const filteredConversations = conversations.filter(c => {
+    // Hide blocked users
+    if (blockedUserIds.includes(c.participant.userId)) return false;
     const displayN = customNicknames[c.id] || c.participant.name;
     return (
       displayN.toLowerCase().includes(searchQuery.toLowerCase()) ||
