@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { X, RotateCcw, Search, Plus } from 'lucide-react';
+import { X, RotateCcw, Search, Plus, Check } from 'lucide-react';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
-import { AVAILABLE_CITIES, AVAILABLE_RELIGIONS, AVAILABLE_INTERESTS } from '@/lib/mock-data';
+import { AVAILABLE_CITIES, AVAILABLE_RELIGIONS, AVAILABLE_INTERESTS, MOCK_PROFILES } from '@/lib/mock-data';
 
 export default function FilterPanel() {
-  const { filters, applyFilters, resetFilters, setShowFilters } = useKinzolaStore();
+  const { filters, applyFilters, resetFilters, setShowFilters, swipedProfileIds } = useKinzolaStore();
   const [localFilters, setLocalFilters] = useState(filters);
   const [selectedCities, setSelectedCities] = useState<string[]>(filters.cities);
   const [selectedReligions, setSelectedReligions] = useState<string[]>(filters.religions);
@@ -16,6 +16,18 @@ export default function FilterPanel() {
   const [citySearch, setCitySearch] = useState('');
   const [customCityInput, setCustomCityInput] = useState('');
   const [showCustomCityInput, setShowCustomCityInput] = useState(false);
+  const [justApplied, setJustApplied] = useState(false);
+
+  // Preview how many profiles will match
+  const previewCount = useMemo(() => {
+    let count = MOCK_PROFILES.filter(p => !swipedProfileIds.has(p.id));
+    if (localFilters.gender !== 'tous') count = count.filter(p => p.gender === localFilters.gender);
+    if (localFilters.ageMin > 18) count = count.filter(p => p.age >= localFilters.ageMin);
+    if (localFilters.ageMax < 99) count = count.filter(p => p.age <= localFilters.ageMax);
+    if (selectedCities.length > 0) count = count.filter(p => selectedCities.includes(p.city));
+    if (selectedReligions.length > 0) count = count.filter(p => selectedReligions.includes(p.religion));
+    return count.length;
+  }, [localFilters, selectedCities, selectedReligions, selectedInterests, swipedProfileIds]);
 
   const toggleCity = (city: string) => {
     setSelectedCities(prev =>
@@ -43,6 +55,8 @@ export default function FilterPanel() {
       interests: selectedInterests,
       gender: selectedGender,
     });
+    setJustApplied(true);
+    setTimeout(() => setJustApplied(false), 2000);
   };
 
   const handleReset = () => {
@@ -50,7 +64,7 @@ export default function FilterPanel() {
     setSelectedReligions([]);
     setSelectedInterests([]);
     setSelectedGender('tous');
-    setLocalFilters({ ageMin: 18, ageMax: 50, cities: [], religions: [], interests: [], gender: 'tous' });
+    setLocalFilters({ ageMin: 18, ageMax: 99, cities: [], religions: [], interests: [], gender: 'tous' });
     resetFilters();
     setShowFilters(false);
   };
@@ -111,19 +125,54 @@ export default function FilterPanel() {
           </div>
         </div>
 
+        {/* Apply Button - en haut */}
+        <div className="px-5 pb-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs text-kinzola-muted">
+              {previewCount} profil{previewCount !== 1 ? 's' : ''} disponible{previewCount !== 1 ? 's' : ''}
+            </span>
+            {justApplied && (
+              <motion.span
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0 }}
+                className="text-xs text-green-400 flex items-center gap-1"
+              >
+                <Check className="w-3 h-3" />
+                Filtres appliqués
+              </motion.span>
+            )}
+          </div>
+          <button
+            onClick={handleApply}
+            className="w-full h-11 rounded-2xl text-white font-semibold text-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
+            style={{
+              background: 'linear-gradient(135deg, #FF4D8D 0%, #FF2D6D 100%)',
+              boxShadow: '0 0 30px rgba(255, 77, 141, 0.4)',
+            }}
+          >
+            Appliquer les filtres
+          </button>
+        </div>
+
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-5 pt-2 pb-4 space-y-5">
           {/* Age Range */}
           <div>
-            <label className="text-[11px] font-medium text-kinzola-muted uppercase tracking-wider mb-3 block">Âge</label>
+            <label className="text-[11px] font-medium text-kinzola-muted uppercase tracking-wider mb-1 block">Tranche d&apos;âge</label>
+            <p className="text-[10px] text-kinzola-muted/60 mb-3">Définissez l&apos;âge min et max des profils visibles</p>
             <div className="flex items-center gap-4">
               <div className="flex-1">
+                <label className="text-[10px] text-kinzola-muted/50 mb-1 block">Minimum</label>
                 <input
                   type="number"
                   min="18"
-                  max="50"
+                  max="99"
                   value={localFilters.ageMin}
-                  onChange={(e) => setLocalFilters({ ...localFilters, ageMin: parseInt(e.target.value) || 18 })}
+                  onChange={(e) => {
+                    const val = Math.max(18, Math.min(99, parseInt(e.target.value) || 18));
+                    setLocalFilters({ ...localFilters, ageMin: val });
+                  }}
                   className="w-full h-11 px-3 rounded-xl glass bg-white/5 text-white text-center text-sm focus:outline-none transition-all"
                   onFocus={(e) => {
                     e.currentTarget.style.boxShadow = '0 0 15px rgba(43, 127, 255, 0.2)';
@@ -133,14 +182,18 @@ export default function FilterPanel() {
                   }}
                 />
               </div>
-              <span className="text-kinzola-muted font-light">—</span>
+              <span className="text-kinzola-muted font-light mt-4">—</span>
               <div className="flex-1">
+                <label className="text-[10px] text-kinzola-muted/50 mb-1 block">Maximum</label>
                 <input
                   type="number"
                   min="18"
-                  max="50"
+                  max="99"
                   value={localFilters.ageMax}
-                  onChange={(e) => setLocalFilters({ ...localFilters, ageMax: parseInt(e.target.value) || 50 })}
+                  onChange={(e) => {
+                    const val = Math.max(18, Math.min(99, parseInt(e.target.value) || 50));
+                    setLocalFilters({ ...localFilters, ageMax: val });
+                  }}
                   className="w-full h-11 px-3 rounded-xl glass bg-white/5 text-white text-center text-sm focus:outline-none transition-all"
                   onFocus={(e) => {
                     e.currentTarget.style.boxShadow = '0 0 15px rgba(43, 127, 255, 0.2)';
@@ -292,20 +345,9 @@ export default function FilterPanel() {
           </div>
         </div>
 
-        {/* Apply Button */}
-        <div className="p-5 safe-bottom">
-          <button
-            onClick={handleApply}
-            className="w-full h-12 rounded-2xl text-white font-semibold text-base transition-all hover:scale-[1.02] active:scale-[0.98]"
-            style={{
-              background: 'linear-gradient(135deg, #FF4D8D 0%, #FF2D6D 100%)',
-              boxShadow: '0 0 30px rgba(255, 77, 141, 0.4)',
-            }}
-          >
-            Appliquer les filtres
-          </button>
-        </div>
+        {/* Bottom spacer */}
+        <div className="p-5 safe-bottom" />
       </div>
     </motion.div>
   );
-}
+        }
