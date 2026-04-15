@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Heart, MoreVertical, Trash2 } from 'lucide-react';
+import { Search, Heart, MoreVertical, Trash2, Ban } from 'lucide-react';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
 import { formatLastSeen } from '@/lib/format-time';
 import ChatScreen from './chat-screen';
@@ -228,6 +228,18 @@ export default function MessagesScreen() {
                   animate={{ opacity: 1, y: 0 }}
                   className="absolute right-2 top-2 glass-strong rounded-xl overflow-hidden min-w-[140px] z-20"
                 >
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      useKinzolaStore.getState().blockUser(conv.participant.userId);
+                      setMenuConvId(null);
+                    }}
+                    className="w-full flex items-center gap-2 px-4 py-3 text-sm text-orange-400 hover:bg-white/5 transition-colors cursor-pointer"
+                  >
+                    <Ban className="w-4 h-4" />
+                    Bloquer
+                  </button>
+                  <div className="h-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
                   <button
                     onClick={(e) => {
                       e.stopPropagation();

@@ -1182,7 +1182,7 @@ export default function ChatScreen() {
                 receivedTimeColor={receivedTimeColor}
                 dividerColor={dividerColor}
                 reaction={messageReactions[msg.id]}
-                isBlurred={actionMessage !== null && actionMessage.message.id !== msg.id}
+                isBlurred={isUserBlocked || (actionMessage !== null && actionMessage.message.id !== msg.id)}
                 onLongPress={() => handleMessageLongPress(msg, msg.senderId === 'user-me')}
                 onSwipeStart={handleSwipeStart}
                 onSwipeEnd={handleSwipeEnd}
