@@ -135,3 +135,22 @@ Stage Summary:
 - 6 files modified: chat-input-bar.tsx, message-notification-banner.tsx, sw.js, use-browser-notifications.ts, use-kinzola-store.ts, app-shell.tsx
 - 1 file rewritten: setup-database/route.ts (dynamic Supabase import)
 - Pushed to https://kinzola.vercel.app/ (master:main)
+---
+Task ID: 1
+Agent: main
+Task: Fix system notifications + story publishing + floating publish button
+
+Work Log:
+- Analyzed notification flow: discovered `use-browser-notifications.ts` hook was causing DUPLICATE system notifications by watching `notifications.length` and calling `showNotification` when the store's `simulateReply` and `startRandomMessages` already fire their own SW notifications directly
+- Removed the duplicate `useEffect` in `use-browser-notifications.ts` (kept permission request + exported functions)
+- Fixed `createStory` in store to insert new stories at BEGINNING of array (`[newStory, ...stories]`) so they appear immediately visible in the stories bar
+- Added custom event `'open-story-creator'` listener in `news-screen.tsx` so the story creator can be opened globally
+- Added floating action button (FAB) in `app-shell.tsx` above the bottom nav - round gradient button with "+" icon, pulse animation, accessible from any tab
+- FAB switches to news tab and opens story creator modal with 400ms delay for tab transition
+- Build compiles cleanly, pushed to production (master → main)
+
+Stage Summary:
+- System notifications now come from single source (store's simulateReply/startRandomMessages) with `silent: true` and `requireInteraction: true` for Android heads-up style
+- Story publishing works: new stories appear immediately at the front of stories bar
+- Floating "+" button above tab bar allows creating stories from any tab
+- Deployed: https://kinzola.vercel.app/

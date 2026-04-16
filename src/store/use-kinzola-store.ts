@@ -732,31 +732,37 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
       // Rich browser notification via Service Worker for incoming message
       try {
         if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+          const notifTitle = `💬 ${conv.participant.name}`;
+          const showFallback = () => {
+            const n = new Notification(notifTitle, { body: replyContent, icon: '/favicon.ico', silent: true, vibrate: [200, 100, 200] });
+            setTimeout(() => { n.close(); }, 8000);
+          };
           if ('serviceWorker' in navigator && navigator.serviceWorker) {
+            // Race: if SW not ready within 3s, fallback to basic Notification
+            const timeout = setTimeout(showFallback, 3000);
             navigator.serviceWorker.ready.then((reg) => {
-              reg.showNotification(`💬 ${conv.participant.name}`, {
-                body: replyContent,
-                icon: '/favicon.ico',
-                badge: '/favicon.ico',
-                tag: `kinzola-msg-${conversationId}-${Date.now()}`,
-                renotify: true,
-                requireInteraction: true,
-                silent: true,
-                vibrate: [200, 100, 200],
-                data: { conversationId, participantName: conv.participant.name },
-                actions: [
-                  { action: 'reply', title: 'Répondre' },
-                  { action: 'mark-read', title: 'Marqué comme lu' },
-                  { action: 'silence', title: 'Silence' },
-                ],
-              });
-            }).catch(() => {
-              const n = new Notification(`💬 ${conv.participant.name}`, { body: replyContent, icon: '/favicon.ico', silent: true, vibrate: [200, 100, 200] });
-              setTimeout(() => { n.close(); }, 5000);
-            });
+              clearTimeout(timeout);
+              try {
+                reg.showNotification(notifTitle, {
+                  body: replyContent,
+                  icon: '/favicon.ico',
+                  badge: '/favicon.ico',
+                  tag: `kinzola-msg-${conversationId}-${Date.now()}`,
+                  renotify: true,
+                  requireInteraction: true,
+                  silent: true,
+                  vibrate: [200, 100, 200],
+                  data: { conversationId, participantName: conv.participant.name },
+                  actions: [
+                    { action: 'reply', title: 'Répondre' },
+                    { action: 'mark-read', title: 'Marqué comme lu' },
+                    { action: 'silence', title: 'Silence' },
+                  ],
+                });
+              } catch { showFallback(); }
+            }).catch(() => { clearTimeout(timeout); showFallback(); });
           } else {
-            const n = new Notification(`💬 ${conv.participant.name}`, { body: replyContent, icon: '/favicon.ico', silent: true, vibrate: [200, 100, 200] });
-            setTimeout(() => { n.close(); }, 5000);
+            showFallback();
           }
         }
       } catch {}
@@ -845,31 +851,36 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
         // Rich browser notification via Service Worker for random incoming message
         try {
           if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+            const notifTitle = `💬 ${randomConv.participant.name}`;
+            const showFallback = () => {
+              const n = new Notification(notifTitle, { body: content, icon: '/favicon.ico', silent: true, vibrate: [200, 100, 200] });
+              setTimeout(() => { n.close(); }, 8000);
+            };
             if ('serviceWorker' in navigator && navigator.serviceWorker) {
+              const timeout = setTimeout(showFallback, 3000);
               navigator.serviceWorker.ready.then((reg) => {
-                reg.showNotification(`💬 ${randomConv.participant.name}`, {
-                  body: content,
-                  icon: '/favicon.ico',
-                  badge: '/favicon.ico',
-                  tag: `kinzola-msg-${randomConv.id}-${Date.now()}`,
-                  renotify: true,
-                  requireInteraction: true,
-                  silent: true,
-                  vibrate: [200, 100, 200],
-                  data: { conversationId: randomConv.id, participantName: randomConv.participant.name },
-                  actions: [
-                    { action: 'reply', title: 'Répondre' },
-                    { action: 'mark-read', title: 'Marqué comme lu' },
-                    { action: 'silence', title: 'Silence' },
-                  ],
-                });
-              }).catch(() => {
-                const n = new Notification(`💬 ${randomConv.participant.name}`, { body: content, icon: '/favicon.ico', silent: true, vibrate: [200, 100, 200] });
-                setTimeout(() => { n.close(); }, 5000);
-              });
+                clearTimeout(timeout);
+                try {
+                  reg.showNotification(notifTitle, {
+                    body: content,
+                    icon: '/favicon.ico',
+                    badge: '/favicon.ico',
+                    tag: `kinzola-msg-${randomConv.id}-${Date.now()}`,
+                    renotify: true,
+                    requireInteraction: true,
+                    silent: true,
+                    vibrate: [200, 100, 200],
+                    data: { conversationId: randomConv.id, participantName: randomConv.participant.name },
+                    actions: [
+                      { action: 'reply', title: 'Répondre' },
+                      { action: 'mark-read', title: 'Marqué comme lu' },
+                      { action: 'silence', title: 'Silence' },
+                    ],
+                  });
+                } catch { showFallback(); }
+              }).catch(() => { clearTimeout(timeout); showFallback(); });
             } else {
-              const n = new Notification(`💬 ${randomConv.participant.name}`, { body: content, icon: '/favicon.ico', silent: true, vibrate: [200, 100, 200] });
-              setTimeout(() => { n.close(); }, 5000);
+              showFallback();
             }
           }
         } catch {}

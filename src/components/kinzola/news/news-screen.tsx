@@ -67,7 +67,6 @@ export default function NewsScreen() {
     commentingPostId,
     addComment,
     setCommentingPostId,
-    setTab,
   } = useKinzolaStore();
 
   const [viewingStoryIndex, setViewingStoryIndex] = useState<number | null>(null);
@@ -166,16 +165,6 @@ export default function NewsScreen() {
       }, 150);
     }
   }, [showCommentBar, commentingPostId, posts]);
-
-  // Listen for global story creator open request (from FAB in app-shell)
-  useEffect(() => {
-    const handleOpenCreator = () => {
-      setTab('news');
-      setShowStoryCreator(true);
-    };
-    window.addEventListener('open-story-creator', handleOpenCreator);
-    return () => window.removeEventListener('open-story-creator', handleOpenCreator);
-  }, [setTab]);
 
   const handleOpenComments = (postId: string) => {
     setCommentingPostId(postId);
@@ -902,16 +891,64 @@ export default function NewsScreen() {
                 <div className="w-10 h-1 rounded-full bg-white/20" />
               </div>
 
-              {/* Header */}
+              {/* Header with Publish button at top */}
               <div className="flex items-center justify-between px-5 py-3">
                 <h3 className="text-lg font-bold">Nouvelle story</h3>
-                <button
-                  onClick={() => !isCreatingStory && setShowStoryCreator(false)}
-                  className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors cursor-pointer"
-                  disabled={isCreatingStory}
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <AnimatePresence mode="wait">
+                    {showStorySuccess ? (
+                      <motion.span
+                        key="success"
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.8, opacity: 0 }}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold text-white"
+                        style={{ background: 'linear-gradient(135deg, #22C55E, #16A34A)' }}
+                      >
+                        <Check className="w-3.5 h-3.5" /> Publié !
+                      </motion.span>
+                    ) : (
+                      <motion.button
+                        key="publish"
+                        onClick={handleCreateStory}
+                        disabled={isCreatingStory || (!storyText.trim() && !storyImage.trim())}
+                        whileTap={{ scale: 0.92 }}
+                        className="px-4 py-1.5 rounded-full text-xs font-bold text-white transition-all disabled:opacity-30 cursor-pointer"
+                        style={{
+                          background: (storyText.trim() || storyImage.trim())
+                            ? 'linear-gradient(135deg, #FF4D8D, #2B7FFF)'
+                            : 'rgba(255, 255, 255, 0.05)',
+                          boxShadow: (storyText.trim() || storyImage.trim())
+                            ? '0 4px 12px rgba(255, 77, 141, 0.3)'
+                            : 'none',
+                        }}
+                      >
+                        {isCreatingStory ? (
+                          <span className="flex items-center gap-1.5">
+                            <motion.span
+                              animate={{ rotate: 360 }}
+                              transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
+                              className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full"
+                            />
+                            Publier...
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1">
+                            <Send className="w-3.5 h-3.5" />
+                            Publier
+                          </span>
+                        )}
+                      </motion.button>
+                    )}
+                  </AnimatePresence>
+                  <button
+                    onClick={() => !isCreatingStory && setShowStoryCreator(false)}
+                    className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors cursor-pointer"
+                    disabled={isCreatingStory}
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
               {/* Content */}
@@ -996,35 +1033,6 @@ export default function NewsScreen() {
                   <Clock className="w-3 h-3" />
                   <span>Expire dans 24h</span>
                 </div>
-
-                {/* Publish button */}
-                <motion.button
-                  onClick={handleCreateStory}
-                  disabled={isCreatingStory || (!storyText.trim() && !storyImage.trim())}
-                  whileTap={{ scale: 0.95 }}
-                  className="w-full py-3.5 rounded-2xl text-sm font-bold text-white transition-all disabled:opacity-30 cursor-pointer"
-                  style={{
-                    background: (storyText.trim() || storyImage.trim())
-                      ? 'linear-gradient(135deg, #FF4D8D, #2B7FFF)'
-                      : 'rgba(255, 255, 255, 0.05)',
-                    boxShadow: (storyText.trim() || storyImage.trim())
-                      ? '0 4px 16px rgba(255, 77, 141, 0.3)'
-                      : 'none',
-                  }}
-                >
-                  {isCreatingStory ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <motion.span
-                        animate={{ rotate: 360 }}
-                        transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
-                        className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
-                      />
-                      Publication...
-                    </span>
-                  ) : (
-                    'Publier la story'
-                  )}
-                </motion.button>
               </div>
             </motion.div>
           </motion.div>
