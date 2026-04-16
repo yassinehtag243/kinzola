@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
 import WelcomeScreen from './auth/welcome-screen';
@@ -63,6 +63,8 @@ export default function AppShell() {
     theme,
     textSize,
     hydrate,
+    isAuthenticated,
+    startRandomMessages,
   } = useKinzolaStore();
 
   // Browser push notifications (real phone notifications)
@@ -77,6 +79,17 @@ export default function AppShell() {
     hydrate();
     setMounted(true);
   }, [hydrate]);
+
+  // Start random incoming messages after login (15-60s intervals)
+  const randomMsgStarted = useRef(false);
+  useEffect(() => {
+    if (isAuthenticated && mounted && !randomMsgStarted.current) {
+      randomMsgStarted.current = true;
+      // Start after 10 seconds delay
+      const timer = setTimeout(() => startRandomMessages(), 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [isAuthenticated, mounted, startRandomMessages]);
 
   // ✅ Utilise les vraies valeurs uniquement après le premier render client
   const safeTheme = mounted ? theme : SSR_THEME;
@@ -240,5 +253,4 @@ export default function AppShell() {
     </div>
   );
 }
-// Deployment refresh - Wed Apr 15 23:48:58 UTC 2026
 

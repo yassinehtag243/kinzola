@@ -730,7 +730,97 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
           setTimeout(() => notif.close(), 5000);
         }
       } catch {}
+
+      // Play notification sound
+      try {
+        if (typeof window !== 'undefined') {
+          const audio = new Audio('/sounds/notification-message.wav');
+          audio.volume = 0.6;
+          audio.play().catch(() => {});
+        }
+      } catch {}
     }, delay);
+  },
+
+  // Random incoming messages (simulate realistic activity)
+  startRandomMessages: () => {
+    if (typeof window === 'undefined') return;
+    const { conversations, blockedUserIds } = get();
+    const availableConvs = conversations.filter(c => !blockedUserIds.includes(c.participant.userId));
+    if (availableConvs.length === 0) return;
+
+    // Random delay between 15-60 seconds
+    const scheduleNext = () => {
+      const delay = 15000 + Math.random() * 45000;
+      const timerId = setTimeout(() => {
+        const currentConvs = get().conversations;
+        const avail = currentConvs.filter(c => !get().blockedUserIds.includes(c.participant.userId));
+        if (avail.length === 0) return;
+
+        const randomConv = avail[Math.floor(Math.random() * avail.length)];
+        const randomMessages = [
+          'Hey ! Tu es là ? 😊',
+          'Je pensais à toi...',
+          'Comment se passe ta journée ?',
+          'T\'as vu le match hier ? ⚽',
+          'On devrait se retrouver un de ces jours',
+          'Tu connais un bon endroit à Kin ?',
+          'J\'aime bien ta photo de profil ❤️',
+          'Bonne nuit ! 🌙',
+          'Tu fais quoi ce weekend ?',
+          'C\'est sympa de discuter avec toi',
+          'Je viens de rentrer chez moi',
+          'Tu es sur Kinshasa aussi ?',
+        ];
+        const content = randomMessages[Math.floor(Math.random() * randomMessages.length)];
+
+        const updatedConvs = currentConvs.map(c => {
+          if (c.id !== randomConv.id) return c;
+          const replyMsg: Message = {
+            id: `msg-${Date.now()}`,
+            senderId: c.participant.userId,
+            receiverId: 'user-me',
+            content,
+            type: 'text',
+            read: false,
+            timestamp: new Date().toISOString(),
+          };
+          return {
+            ...c,
+            messages: [...c.messages, replyMsg],
+            lastMessage: content,
+            lastMessageTime: 'Maintenant',
+            unreadCount: (c.unreadCount || 0) + 1,
+          };
+        });
+        set({ conversations: updatedConvs });
+
+        // Add notification
+        get().addNotification({
+          type: 'message',
+          title: `${randomConv.participant.name} vous a envoyé un message`,
+          message: content,
+          fromUserId: randomConv.participant.userId,
+          fromUserName: randomConv.participant.name,
+          fromUserPhoto: randomConv.participant.photoUrl,
+        });
+
+        // Play sound
+        try {
+          const audio = new Audio('/sounds/notification-message.wav');
+          audio.volume = 0.6;
+          audio.play().catch(() => {});
+        } catch {}
+
+        // Schedule next random message
+        scheduleNext();
+      }, delay);
+
+      // Store timer ID for cleanup
+      (get() as any)._randomMsgTimer = timerId;
+    };
+
+    scheduleNext();
   },
 
   // Posts Actions

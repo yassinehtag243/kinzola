@@ -22,12 +22,12 @@ export default function MessagesScreen() {
     return () => clearInterval(id);
   }, []);
 
-  // Tick online status every 8 seconds
+  // Tick online status every 6 seconds (fast)
   useEffect(() => {
     const id = setInterval(() => {
       tickOnlineStatus();
       setClientNow(new Date());
-    }, 8000);
+    }, 6000);
     return () => clearInterval(id);
   }, [tickOnlineStatus]);
 
@@ -178,21 +178,23 @@ export default function MessagesScreen() {
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <p className="text-[12px] text-kinzola-muted truncate pr-2">
+                    <div className="flex-1 min-w-0 pr-2">
                       {conv.online ? (
-                        <span className="flex items-center gap-1" style={{ color: '#FF2D6F' }}>
+                        <span className="flex items-center gap-1 text-[12px]" style={{ color: '#FF2D6F' }}>
                           <span style={{ filter: 'drop-shadow(0 0 4px rgba(255, 45, 111, 0.7))' }}>❤️</span>
                           <span className="font-semibold" style={{ textShadow: '0 0 8px rgba(255, 45, 111, 0.5)' }}>En ligne</span>
                         </span>
                       ) : (
-                        <>
+                        <p className="text-[12px] text-kinzola-muted truncate">
                           {conv.lastMessage}
-                          <span className="block text-[10px] text-kinzola-muted/60">
-                            Vu {formatLastSeen(conv.lastSeen, clientNow)}
-                          </span>
-                        </>
+                        </p>
                       )}
-                    </p>
+                      {!conv.online && (
+                        <span className="block text-[10px] text-kinzola-muted/60">
+                          Vu {formatLastSeen(conv.lastSeen, clientNow)}
+                        </span>
+                      )}
+                    </div>
                     {conv.unreadCount > 0 && (
                       <span
                         className="min-w-[20px] h-5 rounded-full flex items-center justify-center px-1.5 flex-shrink-0"

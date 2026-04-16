@@ -11,6 +11,7 @@ export default function EditProfile() {
   const { user, setShowEditProfile, updateProfile } = useKinzolaStore();
   const [form, setForm] = useState({
     name: user?.name || '',
+    pseudo: user?.pseudo || '',
     age: user?.age?.toString() || '',
     gender: user?.gender || 'femme',
     city: user?.city || '',
@@ -18,6 +19,8 @@ export default function EditProfile() {
     religion: user?.religion || '',
     bio: user?.bio || '',
     interests: user?.interests || [] as string[],
+    lookingFor: (user as any)?.lookingFor || 'relation sérieuse',
+    height: (user as any)?.height?.toString() || '',
   });
 
   // Local gallery state (synced with user.photoGallery)
@@ -81,6 +84,7 @@ export default function EditProfile() {
   const handleSave = () => {
     updateProfile({
       name: form.name,
+      pseudo: form.pseudo,
       age: parseInt(form.age) || user?.age || 25,
       gender: form.gender as 'homme' | 'femme',
       city: form.city,
@@ -89,7 +93,9 @@ export default function EditProfile() {
       bio: form.bio,
       interests: form.interests,
       photoGallery: localGallery,
-    });
+      lookingFor: form.lookingFor,
+      height: parseInt(form.height) || undefined,
+    } as any);
     setShowEditProfile(false);
   };
 
@@ -261,6 +267,17 @@ export default function EditProfile() {
             />
           </div>
 
+          <div>
+            <label className="text-[11px] text-kinzola-muted mb-1 block">Pseudo</label>
+            <input
+              type="text"
+              value={form.pseudo}
+              onChange={(e) => updateForm('pseudo', e.target.value)}
+              className={inputClass}
+              placeholder="Votre pseudo unique"
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-[11px] text-kinzola-muted mb-1 block">Âge</label>
@@ -316,6 +333,32 @@ export default function EditProfile() {
                 <option key={rel} value={rel} className="bg-kinzola-deep">{rel}</option>
               ))}
             </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[11px] text-kinzola-muted mb-1 block">Taille (cm)</label>
+              <input
+                type="number"
+                value={form.height}
+                onChange={(e) => updateForm('height', e.target.value)}
+                className={inputClass}
+                placeholder="165"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] text-kinzola-muted mb-1 block">Je cherche</label>
+              <select
+                value={form.lookingFor}
+                onChange={(e) => updateForm('lookingFor', e.target.value)}
+                className="w-full h-12 px-4 rounded-xl glass bg-white/5 text-white text-sm focus:outline-none transition-all appearance-none"
+              >
+                <option value="relation sérieuse" className="bg-kinzola-deep">Relation sérieuse</option>
+                <option value="amitié" className="bg-kinzola-deep">Amitié</option>
+                <option value="discussion" className="bg-kinzola-deep">Discussion</option>
+                <option value="rien de spécial" className="bg-kinzola-deep">Rien de spécial</option>
+              </select>
+            </div>
           </div>
 
           <div>
