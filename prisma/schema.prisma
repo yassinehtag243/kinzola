@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String   @id @default(cuid())
+  email      String   @unique
+  phone      String?
+  name       String
+  age        Int
+  gender     String   @default("femme")
+  city       String   @default("Kinshasa")
+  profession String?
+  religion   String?
+  bio        String?
+  photoUrl   String?
+  photoGallery String?
+  verified   Boolean  @default(false)
+  preferences String?
+  interests   String?
+  online     Boolean @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  matches1   Match[]  @relation("User1Matches")
+  matches2   Match[]  @relation("User2Matches")
+  messages   Message[]
+  posts      Post[]
+  comments   Comment[]
+  likes      Like[]
+  blocks1    Block[]  @relation("Blocker")
+  blocks2    Block[]  @relation("Blocked")
+  reports1   Report[] @relation("Reporter")
+  reports2   Report[] @relation("Reported")
+}
+
+model Match {
+  id        String   @id @default(cuid())
+  user1Id   String
+  user2Id   String
+  createdAt DateTime @default(now())
+
+  user1     User     @relation("User1Matches", fields: [user1Id], references: [id])
+  user2     User     @relation("User2Matches", fields: [user2Id], references: [id])
+  messages  Message[]
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  senderId  String
+  receiverId String
+  content   String
+  type      String   @default("text")
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  sender    User     @relation(fields: [senderId], references: [id])
+  matchId   String?
+  match     Match?   @relation(fields: [matchId], references: [id])
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  authorId  String
+  content   String
+  imageUrl  String?
+  views     Int      @default(0)
+  likes     Int      @default(0)
+  createdAt DateTime @default(now())
+  expiresAt DateTime?
+
+  author    User     @relation(fields: [authorId], references: [id])
+  comments  Comment[]
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  postId    String
+  authorId  String
+  content   String
+  createdAt DateTime @default(now())
+
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id])
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  userId    String
+  targetId  String
+  type      String   @default("profile")
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Block {
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  blocker   User     @relation("Blocker", fields: [blockerId], references: [id])
+  blocked   User     @relation("Blocked", fields: [blockedId], references: [id])
+}
+
+model Report {
+  id        String   @id @default(cuid())
+  reporterId String
+  reportedId String
+  reason    String?
+  createdAt DateTime @default(now())
+
+  reporter  User     @relation("Reporter", fields: [reporterId], references: [id])
+  reported  User     @relation("Reported", fields: [reportedId], references: [id])
+}
