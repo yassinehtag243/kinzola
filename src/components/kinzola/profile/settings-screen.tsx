@@ -22,8 +22,6 @@ import PrivacyPolicyScreen from './privacy-policy-screen';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
 import { useNotificationSound } from '@/hooks/use-notification-sound';
 import type { NotificationSoundType } from '@/hooks/use-notification-sound';
-import usePushNotifications from '@/hooks/use-push-notifications';
-import { Smartphone } from 'lucide-react';
 
 // ─── Animated Toggle Switch ───
 function ToggleSwitch({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
@@ -1033,9 +1031,6 @@ export default function SettingsScreen() {
 
   const isLight = theme === 'light';
 
-  // Push notifications
-  const { permission: pushPermission, isSupported: pushSupported, requestPermission: requestPushPermission } = usePushNotifications();
-
   // Local text size selection (applied only on save)
   const [pendingTextSize, setPendingTextSize] = useState(textSize);
   const [textSizeSaved, setTextSizeSaved] = useState(true);
@@ -1298,30 +1293,6 @@ export default function SettingsScreen() {
             enabled={notifSuggestions}
             onToggle={() => setNotifSuggestions(!notifSuggestions)}
           />
-          <SectionDivider />
-          {/* Push notifications (native browser) */}
-          {pushSupported && (
-            <>
-              <ToggleRow
-                icon={Smartphone}
-                label="Notifications push"
-                description={pushPermission === 'granted' ? 'Activées' : pushPermission === 'denied' ? 'Bloquées par le navigateur' : 'Recevez des alertes sur votre téléphone'}
-                iconBg="rgba(77, 255, 180, 0.15)"
-                iconColor="#4DFFB4"
-                enabled={pushPermission === 'granted'}
-                onToggle={async () => {
-                  if (pushPermission !== 'granted') {
-                    const granted = await requestPushPermission();
-                    if (granted) {
-                      showToast('Notifications push activées !', 'success');
-                    } else {
-                      showToast('Notifications refusées. Vérifiez les paramètres de votre navigateur.', 'error');
-                    }
-                  }
-                }}
-              />
-            </>
-          )}
           <SectionDivider />
         </SettingsSection>
 

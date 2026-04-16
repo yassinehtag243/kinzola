@@ -48,7 +48,7 @@ function ConfettiParticle({ index }: { index: number }) {
 }
 
 export default function MatchModal() {
-  const { showMatchModal, matchProfile, setShowMatchModal, setTab, conversations, openChat, user } = useKinzolaStore();
+  const { showMatchModal, matchProfile, setShowMatchModal, setTab, conversations, openChat } = useKinzolaStore();
 
   if (!showMatchModal || !matchProfile) return null;
 
@@ -139,7 +139,7 @@ export default function MatchModal() {
             }}
           >
             <img
-              src={user?.photoUrl || 'https://i.pravatar.cc/300?img=44'}
+              src="https://i.pravatar.cc/300?img=44"
               alt="You"
               className="w-full h-full rounded-full object-cover"
               style={{ border: '2px solid #060E1A' }}

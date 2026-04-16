@@ -23,12 +23,6 @@ export const metadata: Metadata = {
     description: "Des rencontres sérieuses, des relations durables",
     type: "website",
   },
-  manifest: "/manifest.json",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "Kinzola",
-  },
 };
 
 export const viewport: Viewport = {

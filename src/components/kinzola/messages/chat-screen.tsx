@@ -1,16 +1,18 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, memo } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import {
   MoreVertical, ArrowLeft, Phone, Video, Flag, Ban, Play, Pause, X, Download,
   Star, Trash2, Reply, Forward, Copy, BookmarkMinus, CheckCheck, Share2, Info, MessageCircle,
+  ShieldOff,
 } from 'lucide-react';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
 import { formatLastSeen } from '@/lib/format-time';
 import type { Message, Conversation } from '@/types';
 import ChatInputBar from './chat-input-bar';
 import ChatContactDetail from './chat-contact-detail';
+import StoryViewerModal from './story-viewer-modal';
 
 // ─── Stable animation constants (no Math.random in render) ───
 const VOICE_WAVEFORM = [4, 8, 14, 10, 6, 12, 16, 8, 4, 10, 14, 6, 8, 12, 16, 10, 4, 14, 8, 6, 12, 10, 8, 4];
@@ -720,6 +722,10 @@ export default function ChatScreen() {
   const isLight = theme === 'light';
   const setShowChatContactDetail = useKinzolaStore((s) => s.setShowChatContactDetail);
   const customNicknames = useKinzolaStore((s) => s.customNicknames);
+  const blockedUserIds = useKinzolaStore((s) => s.blockedUserIds);
+  const simulateReply = useKinzolaStore((s) => s.simulateReply);
+  const unblockUser = useKinzolaStore((s) => s.unblockUser);
+  const storeStories = useKinzolaStore((s) => s.stories);
 
   // ─── Local state ───
   const [showMenu, setShowMenu] = useState(false);
@@ -735,6 +741,7 @@ export default function ChatScreen() {
   const [swipedMessageId, setSwipedMessageId] = useState<string | null>(null);
   const [showForwardPicker, setShowForwardPicker] = useState(false);
   const [messageReactions, setMessageReactions] = useState<Record<string, string>>({});
+  const [viewingStoryUserId, setViewingStoryUserId] = useState<string | null>(null);
 
   // ─── Derived values ───
   const conversation = conversations.find((c) => c.id === currentChatId);
@@ -742,8 +749,16 @@ export default function ChatScreen() {
   const messages = conversation?.messages ?? [];
   const participant = conversation?.participant ?? null;
   const online = participant?.online ?? false;
-  const displayName = customNicknames[conversationId] || participant.name;
+  const displayName = customNicknames[conversationId] || participant?.name || 'Inconnu';
   const lastMsgId = messages.length > 0 ? messages[messages.length - 1].id : '';
+  const isUserBlocked = participant ? blockedUserIds.includes(participant.userId) : false;
+
+  // Check if this participant has stories
+  const participantStories = useMemo(() => {
+    if (!participant) return [];
+    return storeStories.filter((s) => s.authorId === participant.userId);
+  }, [participant, storeStories]);
+  const hasStory = participantStories.length > 0;
 
   // ─── Refs ───
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -893,79 +908,12 @@ export default function ChatScreen() {
       setVoicePlayback({ playingId: null, progress: 0, currentTime: 0, duration: 0, status: 'idle' });
     };
 
-    audio.onerror = async () => {
+    audio.onerror = () => {
       if (playingVoiceIdRef.current !== msgId) return;
-      console.warn('[Voice] Audio error, trying WAV fallback...');
-
-      // ─── Fallback: decode via AudioContext and create WAV blob ───
-      try {
-        cleanupAudio();
-        stopRaf();
-
-        const response = await fetch(audioUrl);
-        const arrayBuffer = await response.arrayBuffer();
-        const audioCtx = new AudioContext();
-        const decoded = await audioCtx.decodeAudioData(arrayBuffer);
-        audioCtx.close();
-
-        // Encode to WAV
-        const numCh = 1;
-        const sr = decoded.sampleRate;
-        const bps = 16;
-        const ba = numCh * (bps / 8);
-        const dataLen = decoded.length * ba;
-        const buf = new ArrayBuffer(44 + dataLen);
-        const dv = new DataView(buf);
-        const ws = (o: number, s: string) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
-        ws(0, 'RIFF'); dv.setUint32(4, 36 + dataLen, true); ws(8, 'WAVE');
-        ws(12, 'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true);
-        dv.setUint16(22, numCh, true); dv.setUint32(24, sr, true);
-        dv.setUint32(28, sr * ba, true); dv.setUint16(32, ba, true);
-        dv.setUint16(34, bps, true); ws(36, 'data'); dv.setUint32(40, dataLen, true);
-        const ch = decoded.getChannelData(0);
-        let off = 44;
-        for (let i = 0; i < decoded.length; i++) {
-          const s = Math.max(-1, Math.min(1, ch[i]));
-          dv.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-          off += 2;
-        }
-
-        const wavBlob = new Blob([buf], { type: 'audio/wav' });
-        const wavUrl = URL.createObjectURL(wavBlob);
-        console.log('[Voice] WAV fallback created successfully');
-
-        // Re-attach handlers and play the WAV
-        audio.onended = () => {
-          if (playingVoiceIdRef.current !== msgId) return;
-          stopRaf(); cleanupAudio(); URL.revokeObjectURL(wavUrl);
-          if (audioRef.current === audio) audioRef.current = null;
-          playingVoiceIdRef.current = null;
-          setVoicePlayback({ playingId: null, progress: 0, currentTime: 0, duration: 0, status: 'idle' });
-        };
-        audio.onerror = () => {
-          if (playingVoiceIdRef.current !== msgId) return;
-          console.error('[Voice] WAV fallback also failed');
-          stopRaf(); cleanupAudio(); URL.revokeObjectURL(wavUrl);
-          setVoicePlayback(prev => prev.playingId === msgId ? { ...prev, status: 'error' } : prev);
-        };
-        audio.oncanplay = () => {
-          if (playingVoiceIdRef.current !== msgId) return;
-          audio.play().then(() => {
-            if (playingVoiceIdRef.current !== msgId) return;
-            setVoicePlayback(prev => prev.playingId === msgId ? { ...prev, status: 'playing' } : prev);
-            rafRef.current = requestAnimationFrame(updateProgress);
-          }).catch(() => {
-            if (playingVoiceIdRef.current !== msgId) return;
-            setVoicePlayback(prev => prev.playingId === msgId ? { ...prev, status: 'error' } : prev);
-          });
-        };
-        audio.preload = 'auto';
-        audio.src = wavUrl;
-      } catch {
-        console.error('[Voice] Fallback decode also failed, showing error');
-        cleanupAudio();
-        setVoicePlayback(prev => prev.playingId === msgId ? { ...prev, status: 'error' } : prev);
-      }
+      console.error('[Voice] Audio error:', audio.error?.code, audio.error?.message);
+      stopRaf();
+      cleanupAudio();
+      setVoicePlayback(prev => prev.playingId === msgId ? { ...prev, status: 'error' } : prev);
     };
 
     // Use canplay (not canplaythrough) — fires as soon as enough data is available.
@@ -999,7 +947,9 @@ export default function ChatScreen() {
     } else {
       sendMessage(conversationId, text);
     }
-  }, [conversationId, sendMessage, sendReplyMessage, replyTo]);
+    // Simulate auto-reply from the other person (2-5s delay)
+    simulateReply(conversationId, text);
+  }, [conversationId, sendMessage, sendReplyMessage, replyTo, simulateReply]);
 
   const handleSendVoice = useCallback((content: string) => {
     if (!conversationId) return;
@@ -1170,8 +1120,28 @@ export default function ChatScreen() {
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div className="flex-1 flex items-center gap-3 min-w-0">
-          <button className="relative flex-shrink-0 cursor-pointer" onClick={() => setShowChatContactDetail(true)}>
-            <img src={participant.photoUrl} alt={participant.name} className="w-10 h-10 rounded-full object-cover" />
+          <button className="relative flex-shrink-0 cursor-pointer" onClick={() => {
+              if (hasStory) {
+                setViewingStoryUserId(participant.userId);
+              } else {
+                setShowChatContactDetail(true);
+              }
+            }}>
+            {hasStory ? (
+              <div
+                className="w-10 h-10 rounded-full p-[2px]"
+                style={{
+                  background: 'linear-gradient(135deg, #FF4D8D, #FFD700, #2B7FFF, #FF4D8D)',
+                  boxShadow: '0 0 10px rgba(255, 77, 141, 0.4)',
+                }}
+              >
+                <div className="w-full h-full rounded-full overflow-hidden">
+                  <img src={participant.photoUrl} alt={participant.name} className="w-full h-full object-cover" />
+                </div>
+              </div>
+            ) : (
+              <img src={participant.photoUrl} alt={participant.name} className="w-10 h-10 rounded-full object-cover" />
+            )}
             {online ? (
               <motion.div className="absolute -bottom-1 -right-1 w-[20px] h-[20px] rounded-full flex items-center justify-center" style={{ background: onlineDotBorder }}
                 animate={{ scale: [1, 1.2, 1], boxShadow: ['0 0 4px rgba(255,45,111,0.3)', '0 0 12px rgba(255,45,111,0.7)', '0 0 4px rgba(255,45,111,0.3)'] }}
@@ -1205,7 +1175,7 @@ export default function ChatScreen() {
                 <div className="fixed inset-0 z-[-1]" onClick={() => setShowMenu(false)} />
                 <button onClick={() => setShowMenu(false)} className="w-full flex items-center gap-2 px-4 py-3 text-sm text-orange-400 hover:bg-white/5 transition-colors cursor-pointer"><Flag className="w-4 h-4" /> Signaler</button>
                 <div className="h-px" style={{ background: dividerColor }} />
-                <button onClick={() => setShowMenu(false)} className="w-full flex items-center gap-2 px-4 py-3 text-sm text-orange-400 hover:bg-white/5 transition-colors cursor-pointer"><Ban className="w-4 h-4" /> Bloquer</button>
+                <button onClick={() => { setShowMenu(false); if (participant) useKinzolaStore.getState().blockUser(participant.userId); }} className="w-full flex items-center gap-2 px-4 py-3 text-sm text-orange-400 hover:bg-white/5 transition-colors cursor-pointer"><Ban className="w-4 h-4" /> Bloquer</button>
                 <div className="h-px" style={{ background: dividerColor }} />
                 <button onClick={handleDelete} className="w-full flex items-center gap-2 px-4 py-3 text-sm text-red-400 hover:bg-white/5 transition-colors cursor-pointer"><X className="w-4 h-4" /> Supprimer</button>
               </motion.div>
@@ -1245,7 +1215,7 @@ export default function ChatScreen() {
                 receivedTimeColor={receivedTimeColor}
                 dividerColor={dividerColor}
                 reaction={messageReactions[msg.id]}
-                isBlurred={actionMessage !== null && actionMessage.message.id !== msg.id}
+                isBlurred={isUserBlocked || (actionMessage !== null && actionMessage.message.id !== msg.id)}
                 onLongPress={() => handleMessageLongPress(msg, msg.senderId === 'user-me')}
                 onSwipeStart={handleSwipeStart}
                 onSwipeEnd={handleSwipeEnd}
@@ -1338,12 +1308,56 @@ export default function ChatScreen() {
         )}
       </AnimatePresence>
 
+      {/* ─── Blocked user banner ─── */}
+      <AnimatePresence>
+        {isUserBlocked && (
+          <motion.div
+            key="blocked-banner"
+            initial={{ opacity: 0, y: -10, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: 'auto' }}
+            exit={{ opacity: 0, y: -10, height: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            className="flex items-center justify-between px-4 py-2.5 flex-shrink-0"
+            style={{
+              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(220, 38, 38, 0.1))',
+              borderTop: '1px solid rgba(239, 68, 68, 0.2)',
+            }}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-sm flex-shrink-0">🚫</span>
+              <span className="text-xs font-medium text-red-400 truncate">
+                Vous avez bloqué cet utilisateur
+              </span>
+            </div>
+            <button
+              onClick={() => participant && unblockUser(participant.userId)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white flex-shrink-0 cursor-pointer transition-transform active:scale-[0.97]"
+              style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)' }}
+            >
+              <ShieldOff className="w-3 h-3" />
+              Débloquer
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ─── Input bar ─── */}
-      <ChatInputBar onSendMessage={handleSendMessage} onSendVoice={handleSendVoice} onSendImage={handleSendImage} />
+      {!isUserBlocked && <ChatInputBar onSendMessage={handleSendMessage} onSendVoice={handleSendVoice} onSendImage={handleSendImage} />}
 
       {/* ─── Chat Contact Detail Overlay ─── */}
       <AnimatePresence>
         <ChatContactDetail />
+      </AnimatePresence>
+
+      {/* ─── Story Viewer Modal ─── */}
+      <AnimatePresence>
+        {viewingStoryUserId && (
+          <StoryViewerModal
+            key={`chat-story-${viewingStoryUserId}`}
+            userId={viewingStoryUserId}
+            onClose={() => setViewingStoryUserId(null)}
+          />
+        )}
       </AnimatePresence>
     </motion.div>
   );

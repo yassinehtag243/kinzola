@@ -179,7 +179,11 @@ interface KinzolaState {
   showChatContactDetail: boolean;
   customNicknames: Record<string, string>; // conversationId -> custom name
   blockedUserIds: string[];
+  mutedConversationIds: string[];
   reports: Array<{ id: string; targetUserId: string; reason: string; createdAt: string }>;
+
+  // Notification Reply
+  pendingNotificationReply: { conversationId: string; participantName: string } | null;
 
   // Actions - Navigation
   setScreen: (screen: ScreenType) => void;
@@ -215,12 +219,16 @@ interface KinzolaState {
   toggleMessageImportant: (conversationId: string, messageId: string) => void;
   forwardMessageToConversation: (targetConversationId: string, content: string) => void;
   deleteConversation: (conversationId: string) => void;
+  simulateReply: (conversationId: string, sentContent: string) => void;
 
   // Actions - Posts
   createPost: (content: string, imageUrl?: string, visibility?: 'public' | 'friends') => void;
   likePost: (postId: string) => void;
   addComment: (postId: string, content: string, isPublic: boolean) => void;
   setCommentingPostId: (postId: string | null) => void;
+
+  // Actions - Stories
+  createStory: (content: string, imageUrl?: string) => void;
 
   // Actions - Theme
   setTheme: (theme: 'light' | 'dark') => void;
@@ -245,6 +253,10 @@ interface KinzolaState {
   setCustomNickname: (conversationId: string, nickname: string) => void;
   blockUser: (userId: string) => void;
   unblockUser: (userId: string) => void;
+  muteConversation: (conversationId: string) => void;
+  unmuteConversation: (conversationId: string) => void;
+  markConversationRead: (conversationId: string) => void;
+  setPendingNotificationReply: (data: { conversationId: string; participantName: string } | null) => void;
   reportUser: (targetUserId: string, reason: string) => void;
   markAllNotificationsRead: () => void;
   markNotificationRead: (notifId: string) => void;
@@ -265,7 +277,7 @@ interface KinzolaState {
 
 const defaultFilters: FilterState = {
   ageMin: 18,
-  ageMax: 99,
+  ageMax: 50,
   cities: [],
   religions: [],
   interests: [],
@@ -306,9 +318,9 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
   showChatContactDetail: false,
   customNicknames: {},
   blockedUserIds: [],
+  mutedConversationIds: [],
   reports: [],
-  swipedProfileIds: new Set<string>(), // tracks liked/passed profile IDs so filters don't re-introduce them
-  onlineStatusMap: {}, // { profileId: boolean } — persistent online status across filter changes
+  pendingNotificationReply: null,
   superLikesRemaining: 5,
   totalLikesReceived: 24,
   totalViews: 156,
@@ -397,32 +409,23 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
       });
     }
 
-    // Remove profile from discover list + track as swiped
+    // Remove profile from discover list
     const updatedProfiles = profiles.filter(p => p.id !== profileId);
-    const swipedProfileIds = new Set(get().swipedProfileIds);
-    swipedProfileIds.add(profileId);
 
     set({
       profiles: updatedProfiles,
       matches: newMatches,
       showMatchModal: isMatch,
       matchProfile: isMatch ? profile : null,
-      swipedProfileIds,
     });
   },
   passProfile: (profileId) => {
     const updatedProfiles = get().profiles.filter(p => p.id !== profileId);
-    const swipedProfileIds = new Set(get().swipedProfileIds);
-    swipedProfileIds.add(profileId);
-    set({ profiles: updatedProfiles, swipedProfileIds });
+    set({ profiles: updatedProfiles });
   },
   useSuperLike: (profileId) => {
     const { profiles, superLikesRemaining } = get();
     if (superLikesRemaining <= 0) return;
-
-    // Track as swiped
-    const swipedProfileIds = new Set(get().swipedProfileIds);
-    swipedProfileIds.add(profileId);
 
     const newMatches = [...get().matches];
     const profile = profiles.find(p => p.id === profileId);
@@ -450,70 +453,52 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
       superLikesRemaining: superLikesRemaining - 1,
       showMatchModal: isMatch,
       matchProfile: isMatch ? profile : null,
-      swipedProfileIds,
     });
   },
   resetDailySuperLikes: () => set({ superLikesRemaining: 5 }),
   tickOnlineStatus: () => {
-    const { profiles, conversations, onlineStatusMap } = get();
+    const { profiles, conversations } = get();
     const now = new Date();
-    const newOnlineMap = { ...onlineStatusMap };
 
-    // Update online status map for ALL profiles (not just visible ones)
-    // This persists through filter changes
-    const allProfileIds = [...new Set([...profiles.map(p => p.id), ...Object.keys(newOnlineMap)])];
-    for (const pid of allProfileIds) {
-      if (Math.random() < 0.15) { // 15% chance to toggle
-        newOnlineMap[pid] = !newOnlineMap[pid];
-      }
-    }
-
-    // Apply online status to current visible profiles
+    // Randomly toggle some profiles' online status
     const updatedProfiles = profiles.map(p => {
-      const isOnline = newOnlineMap[p.id] !== undefined ? newOnlineMap[p.id] : p.online;
-      return { ...p, online: isOnline };
+      if (Math.random() < 0.2) { // 20% chance to toggle each profile
+        const isNowOnline = !p.online;
+        return {
+          ...p,
+          online: isNowOnline,
+          lastSeen: isNowOnline ? p.lastSeen : now.toISOString(),
+        };
+      }
+      return p;
     });
 
-    // Apply to conversations too
     const updatedConversations = conversations.map(c => {
-      const isOnline = newOnlineMap[c.participant?.userId] !== undefined
-        ? newOnlineMap[c.participant.userId]
-        : c.online;
-      return { ...c, online: isOnline };
+      if (Math.random() < 0.2) {
+        const isNowOnline = !c.online;
+        return {
+          ...c,
+          online: isNowOnline,
+          lastSeen: isNowOnline ? c.lastSeen : now.toISOString(),
+        };
+      }
+      return c;
     });
 
-    set({ profiles: updatedProfiles, conversations: updatedConversations, onlineStatusMap: newOnlineMap });
+    set({ profiles: updatedProfiles, conversations: updatedConversations });
   },
   selectProfile: (profile) => set({ selectedProfile: profile, showProfileDetail: profile !== null }),
   applyFilters: (filters) => {
-    const { user, swipedProfileIds, onlineStatusMap } = get();
+    const { user } = get();
     const filtered = filterAndSortProfiles(user, MOCK_PROFILES, filters);
-    // Exclude already swiped profiles
-    const available = filtered.filter(p => !swipedProfileIds.has(p.id));
-    // Merge persistent online status
-    const withOnline = available.map(p => ({
-      ...p,
-      online: onlineStatusMap[p.id] !== undefined ? onlineStatusMap[p.id] : p.online,
-    }));
-    // Save filters to localStorage
-    try { localStorage.setItem('kinzola-filters', JSON.stringify(filters)); } catch {}
-    set({ filters, profiles: withOnline, showFilters: false });
+    set({ filters, profiles: filtered, showFilters: false });
   },
   resetFilters: () => {
-    const { user, swipedProfileIds, onlineStatusMap } = get();
-    const filtered = user
+    const { user } = get();
+    const sorted = user
       ? sortProfilesByCompatibility(user, MOCK_PROFILES)
       : MOCK_PROFILES;
-    // Exclude already swiped
-    const available = filtered.filter(p => !swipedProfileIds.has(p.id));
-    // Merge persistent online status
-    const withOnline = available.map(p => ({
-      ...p,
-      online: onlineStatusMap[p.id] !== undefined ? onlineStatusMap[p.id] : p.online,
-    }));
-    // Clear saved filters
-    try { localStorage.removeItem('kinzola-filters'); } catch {}
-    set({ filters: defaultFilters, profiles: withOnline });
+    set({ filters: defaultFilters, profiles: sorted });
   },
   setShowFilters: (show) => set({ showFilters: show }),
 
@@ -667,6 +652,239 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
     set({ conversations: updatedConversations, currentChatId: null });
   },
 
+  // Simulate incoming reply from the other person (mock auto-reply)
+  simulateReply: (conversationId: string, sentContent: string) => {
+    const { conversations, user, blockedUserIds } = get();
+    const conv = conversations.find(c => c.id === conversationId);
+    if (!conv || blockedUserIds.includes(conv.participant.userId)) return;
+
+    // Generate a contextual reply based on what was sent
+    const replies = [
+      'Haha c\'est vrai 😂',
+      'Oh j\'adore ça !',
+      'Tu es très intéressant(e) 🥰',
+      'On se voit quand ?',
+      'Moi aussi je pense la même chose',
+      'Trop bien ! Dis m\'en plus',
+      'Je suis d\'accord avec toi 💯',
+      'C\'est beau ce que tu dis ❤️',
+      'Ah oui ? Et après ?',
+      'Je n\'ai pas encore vu ça, raconte moi',
+      'Tu me fais rire 😄',
+      'C\'est gentil de ta part',
+      'On a beaucoup en commun je trouve',
+      'Je kiffe ta vibe 🙌',
+      'C\'est cool, on devrait en parler plus',
+    ];
+
+    // Pick a reply (try to be contextually relevant sometimes)
+    let replyContent: string;
+    const lower = sentContent.toLowerCase();
+    if (lower.includes('bonjour') || lower.includes('salut') || lower.includes('hey') || lower.includes('yo')) {
+      replyContent = 'Salut ! Comment tu vas ? 😊';
+    } else if (lower.includes('ça va') || lower.includes('comment') || lower.includes('how')) {
+      replyContent = 'Je vais bien merci ! Et toi ?';
+    } else if (lower.includes('nom') || lower.includes('appell')) {
+      replyContent = `Moi c'est ${conv.participant.name}, enchanté(e) ! 😊`;
+    } else if (lower.includes('match') || lower.includes('plais')) {
+      replyContent = 'Oui je suis content(e) de ce match ! Tu me plais beaucoup ❤️';
+    } else if (lower.includes('photo') || lower.includes('voir') || lower.includes('rencontr')) {
+      replyContent = 'Oui avec plaisir ! On peut se voir un de ces jours 🥰';
+    } else {
+      replyContent = replies[Math.floor(Math.random() * replies.length)];
+    }
+
+    // Delay 2-5 seconds before "replying"
+    const delay = 2000 + Math.random() * 3000;
+    setTimeout(() => {
+      const currentConvs = get().conversations;
+      const updatedConvs = currentConvs.map(c => {
+        if (c.id !== conversationId) return c;
+        const replyMsg: Message = {
+          id: `msg-${Date.now()}`,
+          senderId: c.participant.userId,
+          receiverId: 'user-me',
+          content: replyContent,
+          type: 'text',
+          read: false,
+          timestamp: new Date().toISOString(),
+        };
+        return {
+          ...c,
+          messages: [...c.messages, replyMsg],
+          lastMessage: replyContent,
+          lastMessageTime: 'Maintenant',
+          unreadCount: (c.unreadCount || 0) + 1,
+        };
+      });
+      set({ conversations: updatedConvs });
+
+      // Also add a notification for the incoming message
+      get().addNotification({
+        type: 'message',
+        title: `${conv.participant.name} vous a envoyé un message`,
+        message: replyContent,
+        fromUserId: conv.participant.userId,
+        fromUserName: conv.participant.name,
+        fromUserPhoto: conv.participant.photoUrl,
+      });
+
+      // Rich browser notification via Service Worker for incoming message
+      try {
+        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+          if ('serviceWorker' in navigator && navigator.serviceWorker) {
+            navigator.serviceWorker.ready.then((reg) => {
+              reg.showNotification(`💬 ${conv.participant.name}`, {
+                body: replyContent,
+                icon: '/favicon.ico',
+                badge: '/favicon.ico',
+                tag: `kinzola-msg-${conversationId}-${Date.now()}`,
+                renotify: true,
+                requireInteraction: true,
+                silent: true,
+                vibrate: [200, 100, 200],
+                data: { conversationId, participantName: conv.participant.name },
+                actions: [
+                  { action: 'reply', title: 'Répondre' },
+                  { action: 'mark-read', title: 'Marqué comme lu' },
+                  { action: 'silence', title: 'Silence' },
+                ],
+              });
+            }).catch(() => {
+              const n = new Notification(`💬 ${conv.participant.name}`, { body: replyContent, icon: '/favicon.ico', silent: true, vibrate: [200, 100, 200] });
+              setTimeout(() => { n.close(); }, 5000);
+            });
+          } else {
+            const n = new Notification(`💬 ${conv.participant.name}`, { body: replyContent, icon: '/favicon.ico', silent: true, vibrate: [200, 100, 200] });
+            setTimeout(() => { n.close(); }, 5000);
+          }
+        }
+      } catch {}
+
+      // Play notification sound
+      try {
+        if (typeof window !== 'undefined') {
+          const audio = new Audio('/sounds/notification-message.wav');
+          audio.volume = 0.6;
+          audio.play().catch(() => {});
+        }
+      } catch {}
+    }, delay);
+  },
+
+  // Random incoming messages (simulate realistic activity)
+  startRandomMessages: () => {
+    if (typeof window === 'undefined') return;
+    const { conversations, blockedUserIds } = get();
+    const availableConvs = conversations.filter(c => !blockedUserIds.includes(c.participant.userId));
+    if (availableConvs.length === 0) return;
+
+    // Random delay between 15-60 seconds
+    const scheduleNext = () => {
+      const delay = 15000 + Math.random() * 45000;
+      const timerId = setTimeout(() => {
+        const currentConvs = get().conversations;
+        const avail = currentConvs.filter(c => !get().blockedUserIds.includes(c.participant.userId));
+        if (avail.length === 0) return;
+
+        const randomConv = avail[Math.floor(Math.random() * avail.length)];
+        const randomMessages = [
+          'Hey ! Tu es là ? 😊',
+          'Je pensais à toi...',
+          'Comment se passe ta journée ?',
+          'T\'as vu le match hier ? ⚽',
+          'On devrait se retrouver un de ces jours',
+          'Tu connais un bon endroit à Kin ?',
+          'J\'aime bien ta photo de profil ❤️',
+          'Bonne nuit ! 🌙',
+          'Tu fais quoi ce weekend ?',
+          'C\'est sympa de discuter avec toi',
+          'Je viens de rentrer chez moi',
+          'Tu es sur Kinshasa aussi ?',
+        ];
+        const content = randomMessages[Math.floor(Math.random() * randomMessages.length)];
+
+        const updatedConvs = currentConvs.map(c => {
+          if (c.id !== randomConv.id) return c;
+          const replyMsg: Message = {
+            id: `msg-${Date.now()}`,
+            senderId: c.participant.userId,
+            receiverId: 'user-me',
+            content,
+            type: 'text',
+            read: false,
+            timestamp: new Date().toISOString(),
+          };
+          return {
+            ...c,
+            messages: [...c.messages, replyMsg],
+            lastMessage: content,
+            lastMessageTime: 'Maintenant',
+            unreadCount: (c.unreadCount || 0) + 1,
+          };
+        });
+        set({ conversations: updatedConvs });
+
+        // Add notification
+        get().addNotification({
+          type: 'message',
+          title: `${randomConv.participant.name} vous a envoyé un message`,
+          message: content,
+          fromUserId: randomConv.participant.userId,
+          fromUserName: randomConv.participant.name,
+          fromUserPhoto: randomConv.participant.photoUrl,
+        });
+
+        // Play sound
+        try {
+          const audio = new Audio('/sounds/notification-message.wav');
+          audio.volume = 0.6;
+          audio.play().catch(() => {});
+        } catch {}
+
+        // Rich browser notification via Service Worker for random incoming message
+        try {
+          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+            if ('serviceWorker' in navigator && navigator.serviceWorker) {
+              navigator.serviceWorker.ready.then((reg) => {
+                reg.showNotification(`💬 ${randomConv.participant.name}`, {
+                  body: content,
+                  icon: '/favicon.ico',
+                  badge: '/favicon.ico',
+                  tag: `kinzola-msg-${randomConv.id}-${Date.now()}`,
+                  renotify: true,
+                  requireInteraction: true,
+                  silent: true,
+                  vibrate: [200, 100, 200],
+                  data: { conversationId: randomConv.id, participantName: randomConv.participant.name },
+                  actions: [
+                    { action: 'reply', title: 'Répondre' },
+                    { action: 'mark-read', title: 'Marqué comme lu' },
+                    { action: 'silence', title: 'Silence' },
+                  ],
+                });
+              }).catch(() => {
+                const n = new Notification(`💬 ${randomConv.participant.name}`, { body: content, icon: '/favicon.ico', silent: true, vibrate: [200, 100, 200] });
+                setTimeout(() => { n.close(); }, 5000);
+              });
+            } else {
+              const n = new Notification(`💬 ${randomConv.participant.name}`, { body: content, icon: '/favicon.ico', silent: true, vibrate: [200, 100, 200] });
+              setTimeout(() => { n.close(); }, 5000);
+            }
+          }
+        } catch {}
+
+        // Schedule next random message
+        scheduleNext();
+      }, delay);
+
+      // Store timer ID for cleanup
+      (get() as any)._randomMsgTimer = timerId;
+    };
+
+    scheduleNext();
+  },
+
   // Posts Actions
   createPost: (content, imageUrl, visibility = 'public') => {
     const { user, posts } = get();
@@ -689,6 +907,25 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
       visibility: postVisibility,
     };
     set({ posts: [newPost, ...posts] });
+  },
+  createStory: (content, imageUrl) => {
+    const { user, stories } = get();
+    if (!user) return;
+    const newStory: import('@/types').Story = {
+      id: `story-${Date.now()}`,
+      authorId: user.id,
+      authorName: user.name,
+      authorPhoto: user.photoUrl,
+      content,
+      imageUrl,
+      views: 0,
+      likes: 0,
+      comments: [],
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      type: imageUrl ? 'photo' : 'text',
+    };
+    set({ stories: [...stories, newStory] });
   },
   likePost: (postId) => {
     const { posts } = get();
@@ -754,22 +991,6 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
       const savedNicknames = localStorage.getItem('kinzola-nicknames');
       if (savedNicknames) {
         updates.customNicknames = JSON.parse(savedNicknames);
-      }
-    } catch {}
-    // Hydrate filters from localStorage
-    try {
-      const savedFilters = localStorage.getItem('kinzola-filters');
-      if (savedFilters) {
-        const parsed = JSON.parse(savedFilters);
-        if (parsed && typeof parsed === 'object') {
-          updates.filters = { ...defaultFilters, ...parsed };
-          // Re-apply filters to show only matching profiles
-          const { swipedProfileIds } = get();
-          const user = get().user;
-          const filtered = filterAndSortProfiles(user, MOCK_PROFILES, updates.filters);
-          const available = filtered.filter((p: Profile) => !swipedProfileIds.has(p.id));
-          updates.profiles = available;
-        }
       }
     } catch {}
     if (Object.keys(updates).length > 0) {
@@ -911,6 +1132,25 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
   unblockUser: (userId) => {
     const { blockedUserIds } = get();
     set({ blockedUserIds: blockedUserIds.filter(id => id !== userId) });
+  },
+  muteConversation: (conversationId) => {
+    const { mutedConversationIds } = get();
+    if (!mutedConversationIds.includes(conversationId)) {
+      set({ mutedConversationIds: [...mutedConversationIds, conversationId] });
+    }
+  },
+  unmuteConversation: (conversationId) => {
+    const { mutedConversationIds } = get();
+    set({ mutedConversationIds: mutedConversationIds.filter(id => id !== conversationId) });
+  },
+  markConversationRead: (conversationId) => {
+    const updatedConvs = get().conversations.map(c =>
+      c.id === conversationId ? { ...c, unreadCount: 0 } : c
+    );
+    set({ conversations: updatedConvs });
+  },
+  setPendingNotificationReply: (data) => {
+    set({ pendingNotificationReply: data });
   },
   reportUser: (targetUserId, reason) => {
     const { reports } = get();

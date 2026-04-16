@@ -1,33 +1,31 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-  X,
-  Heart,
-  Star,
-  ChevronRight,
-  MapPin,
-  UserPlus,
-} from 'lucide-react';
+import { useRef, memo } from 'react';
+import { motion, useMotionValue, useTransform, PanInfo } from 'framer-motion';
+import { X, Heart, Star, ChevronRight, CheckCircle2, MapPin, UserPlus } from 'lucide-react';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
 import { VerifiedBadgeStatic } from '@/components/kinzola/shared/verified-badge';
 import type { Profile } from '@/types';
 
-// ---------------------------------------------------------------------------
-// SimpleProfileCard — static card with profile info (no drag)
-// ---------------------------------------------------------------------------
-function SimpleProfileCard({
-  profile,
-  isTop,
-  stackIndex,
-}: {
-  profile: Profile;
-  isTop: boolean;
-  stackIndex: number;
-}) {
+const SwipeCard = memo(function SwipeCard({ profile, onSwipe, isTop, stackIndex, intentLabel, intentColor }: { profile: Profile; onSwipe: (dir: 'left' | 'right' | 'up') => void; isTop: boolean; stackIndex: number; intentLabel: string; intentColor: string }) {
+  const x = useMotionValue(0);
+  const rotate = useTransform(x, [-200, 0, 200], [-15, 0, 15]);
+  const opacity = useTransform(x, [-200, -100, 0, 100, 200], [0.5, 1, 1, 1, 0.5]);
+  const likeOpacity = useTransform(x, [0, 100], [0, 1]);
+  const passOpacity = useTransform(x, [-100, 0], [1, 0]);
+
+  const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    const threshold = 100;
+    if (info.offset.x > threshold) {
+      onSwipe('right');
+    } else if (info.offset.x < -threshold) {
+      onSwipe('left');
+    } else if (info.offset.y < -threshold) {
+      onSwipe('up');
+    }
+  };
+
   if (!isTop) {
-    // Background cards: small stack effect
     const scale = 1 - stackIndex * 0.05;
     const yOffset = stackIndex * -10;
     return (
@@ -38,321 +36,204 @@ function SimpleProfileCard({
           zIndex: 10 - stackIndex,
         }}
       >
-        <img
-          src={profile.photoUrl}
-          alt={profile.name}
-          className="w-full h-full object-cover"
-          draggable={false}
-        />
+        <img src={profile.photoUrl} alt={profile.name} className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-black/50 rounded-3xl" />
       </div>
     );
   }
 
   return (
-    <div
-      className="absolute inset-0 rounded-3xl overflow-hidden"
-      style={{
-        zIndex: 10,
-        boxShadow: '0 8px 40px rgba(0, 0, 0, 0.5)',
-      }}
+    <motion.div
+      className="absolute inset-0 cursor-grab active:cursor-grabbing swipe-card"
+      style={{ x, rotate, opacity }}
+      drag={isTop ? 'x' : false}
+      dragConstraints={{ left: 0, right: 0 }}
+      dragElastic={0.8}
+      onDragEnd={handleDragEnd}
+      whileDrag={{ scale: 1.02 }}
     >
-      {/* Photo */}
-      <img
-        src={profile.photoUrl}
-        alt={profile.name}
-        className="w-full h-full object-cover"
-        draggable={false}
-      />
+      <div className="relative w-full h-full rounded-3xl overflow-hidden" style={{
+        boxShadow: '0 8px 40px rgba(0, 0, 0, 0.5)',
+      }}>
+        <img src={profile.photoUrl} alt={profile.name} className="w-full h-full object-cover" />
+        
+        {/* Very dark bottom gradient for readability */}
+        <div
+          className="absolute inset-x-0 bottom-0 h-[65%]"
+          style={{
+            background: 'linear-gradient(to top, rgba(6, 14, 26, 0.95) 0%, rgba(6, 14, 26, 0.6) 50%, transparent 100%)',
+          }}
+        />
+        
+        {/* Like indicator - shows Amitié or Amour */}
+        <motion.div
+          className="absolute top-8 right-6 px-6 py-2 rounded-xl border-[3px] font-bold text-2xl rotate-12"
+          style={{ opacity: likeOpacity, borderColor: intentColor, color: intentColor }}
+        >
+          {intentLabel}
+        </motion.div>
+        
+        {/* Pass indicator */}
+        <motion.div
+          style={{ opacity: passOpacity }}
+          className="absolute top-8 left-6 px-6 py-2 rounded-xl border-[3px] border-red-400 text-red-400 font-bold text-2xl -rotate-12"
+        >
+          PASS
+        </motion.div>
 
-      {/* Dark bottom gradient */}
-      <div
-        className="absolute inset-x-0 bottom-0 h-[65%]"
-        style={{
-          background:
-            'linear-gradient(to top, rgba(6, 14, 26, 0.95) 0%, rgba(6, 14, 26, 0.6) 50%, transparent 100%)',
-        }}
-      />
-
-      {/* Profile info */}
-      <div className="absolute bottom-0 left-0 right-0 p-6 z-10">
-        {/* Name & age */}
-        <div className="flex items-center gap-2 mb-1">
-          <h3 className="text-[22px] font-bold text-white">
-            {profile.name}, {profile.age}
-          </h3>
-          {profile.verified && <VerifiedBadgeStatic size="md" />}
-        </div>
-
-        {/* Location */}
-        <div className="flex items-center gap-2 mb-1">
-          <MapPin className="w-3.5 h-3.5 text-white/60" />
-          <p className="text-white/70 text-sm">
-            {profile.city}
-            {profile.distance ? ` \u2022 ${profile.distance}km` : ''}
-          </p>
-        </div>
-
-        {/* Profession */}
-        <p className="text-white/60 text-sm mb-3">{profile.profession}</p>
-
-        {/* Bio */}
-        {profile.bio && (
-          <p className="text-white/50 text-xs mb-3 line-clamp-2">
-            {profile.bio}
-          </p>
-        )}
-
-        {/* Interest tags */}
-        <div className="flex flex-wrap gap-1.5">
-          {profile.interests.slice(0, 3).map((interest) => (
-            <span
-              key={interest}
-              className="px-2.5 py-1 rounded-full text-[11px] font-medium text-white/80"
-              style={{
-                background: 'rgba(15, 25, 50, 0.6)',
-                backdropFilter: 'blur(8px)',
-                WebkitBackdropFilter: 'blur(8px)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-              }}
-            >
-              {interest}
-            </span>
-          ))}
+        {/* Profile Info */}
+        <div className="absolute bottom-0 left-0 right-0 p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="text-[22px] font-bold text-white">{profile.name}, {profile.age}</h3>
+            {profile.verified && (
+              <VerifiedBadgeStatic size="md" />
+            )}
+          </div>
+          <div className="flex items-center gap-2 mb-1">
+            <MapPin className="w-3.5 h-3.5 text-white/60" />
+            <p className="text-white/70 text-sm">
+              {profile.city}{profile.distance ? ` • ${profile.distance}km` : ''}
+            </p>
+          </div>
+          <p className="text-white/60 text-sm mb-3">{profile.profession}</p>
+          {profile.bio && (
+            <p className="text-white/50 text-xs mb-3 line-clamp-2">{profile.bio}</p>
+          )}
+          <div className="flex flex-wrap gap-1.5">
+            {profile.interests.slice(0, 3).map(interest => (
+              <span
+                key={interest}
+                className="px-2.5 py-1 rounded-full text-[11px] font-medium text-white/80"
+                style={{
+                  background: 'rgba(15, 25, 50, 0.6)',
+                  backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                }}
+              >
+                {interest}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
-}
+});
 
-// ---------------------------------------------------------------------------
-// EmptyState
-// ---------------------------------------------------------------------------
-function EmptyState() {
-  return (
-    <div className="flex-1 flex items-center justify-center p-8 text-center">
-      <motion.div
-        initial={{ opacity: 0, y: 20, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.5, ease: 'easeOut' }}
-        className="flex flex-col items-center"
-      >
-        <div
-          className="w-24 h-24 rounded-full flex items-center justify-center mb-6"
-          style={{
-            background: 'rgba(255, 77, 141, 0.08)',
-            border: '2px solid rgba(255, 77, 141, 0.15)',
-          }}
-        >
-          <Heart className="w-12 h-12 text-kinzola-pink animate-heartbeat" />
-        </div>
-
-        <h3 className="text-xl font-bold text-white mb-2">
-          Plus de profils pour le moment
-        </h3>
-        <p className="text-kinzola-muted text-sm max-w-[260px] leading-relaxed">
-          Revenez plus tard pour découvrir de nouveaux profils dans votre zone
-        </p>
-
-        <div className="flex items-center gap-2 mt-6">
-          <span className="w-1.5 h-1.5 rounded-full bg-kinzola-pink/40" />
-          <span className="w-1.5 h-1.5 rounded-full bg-kinzola-blue/40" />
-          <span className="w-1.5 h-1.5 rounded-full bg-kinzola-pink/40" />
-        </div>
-      </motion.div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// SwipeView — simplified: cards + big buttons, no drag
-// ---------------------------------------------------------------------------
 export default function SwipeView() {
-  const {
-    profiles,
-    likeProfile,
-    passProfile,
-    useSuperLike: superLikeProfile,
-    selectProfile,
-    discoverIntent,
-    superLikesRemaining,
-  } = useKinzolaStore();
-
-  const isAnimatingRef = useRef(false);
-  const [exitDir, setExitDir] = useState<'left' | 'right' | 'up' | null>(null);
-  const [animKey, setAnimKey] = useState(0);
+  const { profiles, likeProfile, passProfile, selectProfile, discoverIntent } = useKinzolaStore();
+  const stackRef = useRef<HTMLDivElement>(null);
 
   const visibleProfiles = profiles.slice(0, 3);
 
-  // Handle action button press
-  const handleAction = useCallback(
-    (direction: 'left' | 'right' | 'up') => {
-      if (isAnimatingRef.current || visibleProfiles.length === 0) return;
-      isAnimatingRef.current = true;
-
-      const topProfile = visibleProfiles[0];
-
-      // Trigger exit animation
-      setExitDir(direction);
-
-      // Execute the store action immediately
-      setTimeout(() => {
-        if (direction === 'right') {
-          likeProfile(topProfile.id);
-        } else if (direction === 'left') {
-          passProfile(topProfile.id);
-        } else {
-          superLikeProfile(topProfile.id);
-        }
-
-        setExitDir(null);
-        setAnimKey((k) => k + 1);
-        isAnimatingRef.current = false;
-      }, 300);
-    },
-    [visibleProfiles, likeProfile, passProfile, superLikeProfile],
-  );
+  // Determine intent label and color for swipe card indicator
+  const intentLabel = discoverIntent === 'amitie' ? 'AMITIÉ' : 'AMOUR';
+  const intentColor = discoverIntent === 'amitie' ? '#2B7FFF' : '#FF4D8D';
 
   if (visibleProfiles.length === 0) {
-    return <EmptyState />;
+    return (
+      <div className="flex-1 flex items-center justify-center p-8 text-center">
+        <div>
+          <Heart className="w-16 h-16 text-kinzola-pink mx-auto mb-4 animate-heartbeat" />
+          <h3 className="text-xl font-bold mb-2">Plus de profils pour le moment</h3>
+          <p className="text-kinzola-muted text-sm">Revenez plus tard pour découvrir de nouveaux profils</p>
+        </div>
+      </div>
+    );
   }
 
-  // Exit animation variants
-  const exitVariants = {
-    left: { x: -500, opacity: 0, rotate: -15 },
-    right: { x: 500, opacity: 0, rotate: 15 },
-    up: { y: -500, opacity: 0, scale: 0.5 },
+  const handleSwipe = (direction: 'left' | 'right' | 'up') => {
+    const topProfile = visibleProfiles[0];
+    if (direction === 'right') {
+      likeProfile(topProfile.id);
+    } else if (direction === 'left') {
+      passProfile(topProfile.id);
+    } else {
+      likeProfile(topProfile.id);
+    }
   };
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-4 pb-4">
-      {/* ===================== ACTION BUTTONS (top) ===================== */}
-      <div className="flex items-center gap-5 mb-4">
-        {/* ---- Pass (red X) ---- */}
-        <motion.button
-          whileTap={{ scale: 0.85 }}
-          onClick={() => handleAction('left')}
-          disabled={!!exitDir}
-          className="w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 disabled:opacity-40 disabled:pointer-events-none"
-          style={{
-            background: 'rgba(15, 25, 50, 0.7)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            border: '1.5px solid rgba(239, 68, 68, 0.4)',
-            boxShadow: '0 0 12px rgba(239, 68, 68, 0.15)',
-          }}
-          aria-label="Passer"
-        >
-          <X className="w-5 h-5 text-red-400" />
-        </motion.button>
-
-        {/* ---- Super Like (blue star) ---- */}
-        <motion.button
-          whileTap={{ scale: 0.85 }}
-          onClick={() => handleAction('up')}
-          disabled={!!exitDir || superLikesRemaining <= 0}
-          className="w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 disabled:opacity-40 disabled:pointer-events-none relative"
-          style={{
-            background: 'rgba(15, 25, 50, 0.7)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            border: '1.5px solid rgba(43, 127, 255, 0.4)',
-            boxShadow: '0 0 12px rgba(43, 127, 255, 0.15)',
-          }}
-          aria-label="Super like"
-        >
-          <Star className="w-5 h-5 text-kinzola-blue" />
-          <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] rounded-full bg-kinzola-blue text-[8px] font-bold text-white flex items-center justify-center px-0.5 shadow-lg">
-            {superLikesRemaining}
-          </span>
-        </motion.button>
-
-        {/* ---- Like / Amour / Amitié (gradient) ---- */}
-        <motion.button
-          whileTap={{ scale: 0.85 }}
-          onClick={() => handleAction('right')}
-          disabled={!!exitDir}
-          className="w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 disabled:opacity-40 disabled:pointer-events-none"
-          style={{
-            background:
-              discoverIntent === 'amitie'
-                ? 'linear-gradient(135deg, #2B7FFF, #1B8FFF)'
-                : 'linear-gradient(135deg, #2B7FFF, #FF4D8D)',
-            boxShadow:
-              discoverIntent === 'amitie'
-                ? '0 0 20px rgba(43, 127, 255, 0.5)'
-                : '0 0 20px rgba(255, 77, 141, 0.5)',
-          }}
-          aria-label={
-            discoverIntent === 'amitie'
-              ? "Demande d'amitié"
-              : "J'aime"
-          }
-        >
-          {discoverIntent === 'amitie' ? (
-            <UserPlus className="w-5 h-5 text-white" />
-          ) : (
-            <Heart className="w-5 h-5 text-white fill-white" />
-          )}
-        </motion.button>
-      </div>
-
-      {/* ===================== CARD STACK ===================== */}
-      <div
-        className="relative w-full max-w-md"
-        style={{ height: 'min(60vh, 500px)' }}
-      >
-        <AnimatePresence mode="popLayout">
-          <motion.div
-            key={visibleProfiles[0]?.id ?? animKey}
-            initial={{ x: 0, y: 0, opacity: 1, scale: 1, rotate: 0 }}
-            animate={
-              exitDir
-                ? {
-                    ...exitVariants[exitDir],
-                    transition: { duration: 0.3, ease: [0.4, 0, 0.2, 1] },
-                  }
-                : { x: 0, y: 0, opacity: 1, scale: 1, rotate: 0 }
-            }
-            exit={
-              exitDir
-                ? {
-                    ...exitVariants[exitDir],
-                    transition: { duration: 0.3, ease: [0.4, 0, 0.2, 1] },
-                  }
-                : undefined
-            }
-            className="absolute inset-0"
-            style={{ zIndex: 10 }}
-          >
-            <SimpleProfileCard
-              profile={visibleProfiles[0]}
-              isTop
-              stackIndex={0}
+    <div className="flex-1 flex flex-col items-center justify-center px-4 pb-2">
+      {/* Card stack */}
+      <div ref={stackRef} className="relative w-full max-w-md" style={{ height: 'min(55vh, 430px)' }}>
+        {[...visibleProfiles].reverse().map((profile, index) => {
+          const stackIndex = visibleProfiles.length - 1 - index;
+          return (
+            <SwipeCard
+              key={profile.id}
+              profile={profile}
+              onSwipe={handleSwipe}
+              isTop={index === visibleProfiles.length - 1}
+              stackIndex={stackIndex}
+              intentLabel={intentLabel}
+              intentColor={intentColor}
             />
-          </motion.div>
-        </AnimatePresence>
-
-        {/* Background cards */}
-        {visibleProfiles.slice(1).map((profile, i) => (
-          <SimpleProfileCard
-            key={profile.id}
-            profile={profile}
-            isTop={false}
-            stackIndex={i + 1}
-          />
-        ))}
-
+          );
+        })}
         {/* View profile button */}
-        {visibleProfiles.length > 0 && !exitDir && (
+        {visibleProfiles.length > 0 && (
           <button
             onClick={() => selectProfile(visibleProfiles[0])}
-            className="absolute top-4 right-4 z-30 w-10 h-10 rounded-full glass flex items-center justify-center hover:bg-white/10 transition-colors duration-200"
-            aria-label="Voir le profil"
+            className="absolute top-4 right-4 z-30 w-10 h-10 rounded-full glass flex items-center justify-center"
           >
             <ChevronRight className="w-5 h-5 text-white" />
           </button>
         )}
+
+        {/* Action Buttons - OVERLAID on bottom of card */}
+        <div className="absolute bottom-4 left-0 right-0 z-30 flex items-center justify-center gap-4">
+          {/* Pass */}
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            onClick={() => handleSwipe('left')}
+            className="w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300"
+            style={{
+              background: 'rgba(10, 20, 40, 0.7)',
+              backdropFilter: 'blur(20px)',
+              border: '1.5px solid rgba(239, 68, 68, 0.4)',
+              boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+            }}
+          >
+            <X className="w-6 h-6 text-red-400" />
+          </motion.button>
+
+          {/* Star / Super Like */}
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            onClick={() => handleSwipe('up')}
+            className="w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300"
+            style={{
+              background: 'rgba(10, 20, 40, 0.7)',
+              backdropFilter: 'blur(20px)',
+              border: '1.5px solid rgba(43, 127, 255, 0.4)',
+              boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+            }}
+          >
+            <Star className="w-5 h-5 text-kinzola-blue" />
+          </motion.button>
+
+          {/* Like / Amitié */}
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            onClick={() => handleSwipe('right')}
+            className="w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300"
+            style={{
+              background: discoverIntent === 'amitie'
+                ? 'linear-gradient(135deg, #2B7FFF, #1B8FFF)'
+                : 'linear-gradient(135deg, #2B7FFF, #FF4D8D)',
+              boxShadow: discoverIntent === 'amitie'
+                ? '0 0 25px rgba(43, 127, 255, 0.5)'
+                : '0 0 25px rgba(255, 77, 141, 0.5)',
+              border: 'none',
+            }}
+          >
+            {discoverIntent === 'amitie'
+              ? <UserPlus className="w-6 h-6 text-white" />
+              : <Heart className="w-6 h-6 text-white fill-white" />
+            }
+          </motion.button>
+        </div>
       </div>
     </div>
   );

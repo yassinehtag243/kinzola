@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Smile, Mic, Send, Camera, Trash2, Loader2 } from 'lucide-react';
 import { usePermission, PermissionModal, PermissionDeniedBanner, PermissionToast } from './permission-manager';
 import dynamic from 'next/dynamic';
+import { useKinzolaStore } from '@/store/use-kinzola-store';
 
 const EmojiPickerReact = dynamic(() => import('./emoji-picker-react'), { ssr: false });
 
@@ -18,6 +19,12 @@ interface ChatInputBarProps {
 //  Utility: Convert blob to data URL
 // ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * Convert blob to data URL.
+ * Note: We do NOT use AudioContext.decodeAudioData for validation because it
+ * does NOT support webm/opus in most browsers, even though <audio> plays it fine.
+ * Validation is done via simple blob size check + the browser's native playback.
+ */
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -33,70 +40,9 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-//  Utility: Convert any audio blob to WAV PCM (universally supported)
-// ═══════════════════════════════════════════════════════════════════════════
-
-function convertToWav(blob: Blob): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        const ctx = new AudioContext();
-        const arrayBuffer = reader.result as ArrayBuffer;
-        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-        ctx.close();
-
-        // Encode as WAV PCM 16-bit mono
-        const numChannels = 1;
-        const sampleRate = audioBuffer.sampleRate;
-        const bitsPerSample = 16;
-        const bytesPerSample = bitsPerSample / 8;
-        const blockAlign = numChannels * bytesPerSample;
-        const dataLength = audioBuffer.length * blockAlign;
-        const buffer = new ArrayBuffer(44 + dataLength);
-        const view = new DataView(buffer);
-
-        // WAV header
-        const writeString = (offset: number, str: string) => {
-          for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
-        };
-        writeString(0, 'RIFF');
-        view.setUint32(4, 36 + dataLength, true);
-        writeString(8, 'WAVE');
-        writeString(12, 'fmt ');
-        view.setUint32(16, 16, true); // chunk size
-        view.setUint16(20, 1, true); // PCM
-        view.setUint16(22, numChannels, true);
-        view.setUint32(24, sampleRate, true);
-        view.setUint32(28, sampleRate * blockAlign, true);
-        view.setUint16(32, blockAlign, true);
-        view.setUint16(34, bitsPerSample, true);
-        writeString(36, 'data');
-        view.setUint32(40, dataLength, true);
-
-        // Interleave and write PCM data (mono: just copy channel 0)
-        const channelData = audioBuffer.getChannelData(0);
-        let offset = 44;
-        for (let i = 0; i < audioBuffer.length; i++) {
-          const sample = Math.max(-1, Math.min(1, channelData[i]));
-          view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
-          offset += 2;
-        }
-
-        resolve(new Blob([buffer], { type: 'audio/wav' }));
-      } catch (err) {
-        console.warn('[Voice] WAV conversion failed, using original blob:', err);
-        // Fallback: return original blob if AudioContext can't decode
-        resolve(blob);
-      }
-    };
-    reader.onerror = () => reject(new Error('FileReader failed for WAV conversion'));
-    reader.readAsArrayBuffer(blob);
-  });
-}
-
 export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendImage }: ChatInputBarProps) {
+  const pendingNotificationReply = useKinzolaStore((s) => s.pendingNotificationReply);
+  const setPendingNotificationReply = useKinzolaStore((s) => s.setPendingNotificationReply);
   const [message, setMessage] = useState('');
   const [showEmoji, setShowEmoji] = useState(false);
   const [showPhotoMenu, setShowPhotoMenu] = useState(false);
@@ -162,6 +108,57 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
       }
     };
   }, []);
+
+  // Track if we came from a notification reply to show send button
+  const [showSendFromReply, setShowSendFromReply] = useState(false);
+
+  // Auto-focus input when notification reply is triggered
+  // Multiple attempts for mobile reliability: RAF → setTimeout 200ms → setTimeout 600ms
+  useEffect(() => {
+    if (!pendingNotificationReply) return;
+
+    // Always show send button immediately
+    setShowSendFromReply(true);
+
+    const attemptFocus = () => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+        // On mobile, click() is more reliable than focus() for opening keyboard
+        inputRef.current.click();
+        return true;
+      }
+      return false;
+    };
+
+    // Attempt 1: Double RAF (next paint)
+    const raf = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (attemptFocus()) {
+          setPendingNotificationReply(null);
+        }
+      });
+    });
+
+    // Attempt 2: After 200ms (mobile DOM ready)
+    const t1 = setTimeout(() => {
+      if (pendingNotificationReply) {
+        attemptFocus();
+        setPendingNotificationReply(null);
+      }
+    }, 200);
+
+    // Attempt 3: After 600ms (fallback for slow devices)
+    const t2 = setTimeout(() => {
+      attemptFocus();
+      setPendingNotificationReply(null);
+    }, 600);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [pendingNotificationReply, setPendingNotificationReply]);
 
   // ─── Handle permission grant ───
   useEffect(() => {
@@ -321,10 +318,8 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
       }
 
       try {
-        // Convert to WAV PCM for universal browser compatibility
-        const wavBlob = await convertToWav(blob);
-        const dataUrl = await blobToDataUrl(wavBlob);
-        console.log('[Voice] Converted to WAV, size:', wavBlob.size, 'type:', wavBlob.type);
+        // Convert to data URL
+        const dataUrl = await blobToDataUrl(blob);
 
         const mins = Math.floor(elapsed / 60);
         const secs = elapsed % 60;
@@ -378,6 +373,7 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
     if (!message.trim()) return;
     onSendMessageRef.current(message.trim());
     setMessage('');
+    setShowSendFromReply(false);
     if (inputRef.current) inputRef.current.focus();
   }, [message]);
 
@@ -449,7 +445,7 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
   }, [requestPermission]);
 
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
-  const isEmpty = message.trim() === '' && !pendingImage;
+  const isEmpty = message.trim() === '' && !pendingImage && !showSendFromReply;
 
   // ═══════════════════════════════════════════════════════════
   //  RENDER

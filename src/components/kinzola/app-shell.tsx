@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
 import WelcomeScreen from './auth/welcome-screen';
@@ -18,7 +18,9 @@ import EditPersonalInfo from './profile/edit-personal-info';
 import MatchModal from './messages/match-modal';
 import SplashScreen from './splash-screen';
 import NotificationSoundManager from './news/notification-sound-manager';
-import PushNotificationManager from './news/push-notification-manager';
+import MatchNotificationBanner from './match-notification-banner';
+import MessageNotificationBanner from './messages/message-notification-banner';
+import { useBrowserNotifications } from '@/hooks/use-browser-notifications';
 
 // ─── Screen slide transition (left/right like mobile navigation) ───
 const screenVariants = {
@@ -62,7 +64,81 @@ export default function AppShell() {
     theme,
     textSize,
     hydrate,
+    isAuthenticated,
+    startRandomMessages,
+    setTab,
+    openChat,
+    markConversationRead,
+    setPendingNotificationReply,
   } = useKinzolaStore();
+
+  // Browser push notifications (real phone notifications)
+  useBrowserNotifications();
+
+  // Handle URL params when opening from notification (outside app)
+  // SW sends: ?action=reply&conv=xxx&name=xxx or ?action=open-chat&conv=xxx
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const action = params.get('action');
+    const convId = params.get('conv');
+    const name = params.get('name');
+
+    if (!action || !convId) return;
+
+    // Wait for hydration + authentication state to be ready
+    const timer = setTimeout(() => {
+      const state = useKinzolaStore.getState();
+      if (state.currentScreen !== 'main') return; // Not logged in yet
+
+      if (action === 'reply') {
+        state.setTab('messages');
+        state.openChat(convId);
+        state.setPendingNotificationReply({ conversationId: convId, participantName: name || '' });
+      } else if (action === 'open-chat') {
+        state.setTab('messages');
+        state.openChat(convId);
+      } else if (action === 'mark-read') {
+        state.markConversationRead(convId);
+        state.setTab('messages');
+      }
+
+      // Clean URL params
+      window.history.replaceState({}, '', window.location.pathname);
+    }, 1500); // Wait for auth + store hydration
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Listen for Service Worker messages (notification actions)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+
+    const handleMessage = (event: MessageEvent) => {
+      const data = event.data;
+      if (!data || data.type !== 'NOTIFICATION_ACTION') return;
+
+      const { action, conversationId, participantName } = data;
+
+      if (action === 'reply') {
+        // Open chat and set focus for reply
+        setTab('messages');
+        openChat(conversationId);
+        setPendingNotificationReply({ conversationId, participantName: participantName || '' });
+      } else if (action === 'mark-read') {
+        markConversationRead(conversationId);
+        setTab('messages');
+      } else if (action === 'open-chat') {
+        setTab('messages');
+        openChat(conversationId);
+      }
+    };
+
+    navigator.serviceWorker.addEventListener('message', handleMessage);
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', handleMessage);
+    };
+  }, [setTab, openChat, markConversationRead, setPendingNotificationReply]);
 
   // ✅ Hydration-safe mounted pattern
   // Avant mounted: SSR et client rendent les mêmes valeurs par défaut
@@ -73,6 +149,17 @@ export default function AppShell() {
     hydrate();
     setMounted(true);
   }, [hydrate]);
+
+  // Start random incoming messages after login (15-60s intervals)
+  const randomMsgStarted = useRef(false);
+  useEffect(() => {
+    if (isAuthenticated && mounted && !randomMsgStarted.current) {
+      randomMsgStarted.current = true;
+      // Start after 10 seconds delay
+      const timer = setTimeout(() => startRandomMessages(), 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [isAuthenticated, mounted, startRandomMessages]);
 
   // ✅ Utilise les vraies valeurs uniquement après le premier render client
   const safeTheme = mounted ? theme : SSR_THEME;
@@ -98,8 +185,11 @@ export default function AppShell() {
       {/* ─── Global Notification Sound Manager (invisible) ─── */}
       <NotificationSoundManager />
 
-      {/* ─── Global Push Notification Manager (invisible) ─── */}
-      <PushNotificationManager />
+      {/* ─── Match Notification Banner (in-app toast en haut) ─── */}
+      <MatchNotificationBanner />
+
+      {/* ─── Message Notification Banner (WhatsApp-style) ─── */}
+      <MessageNotificationBanner />
 
       <AnimatePresence mode="wait">
         {currentScreen === 'welcome' && (
@@ -236,3 +326,4 @@ export default function AppShell() {
     </div>
   );
 }
+

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, SlidersHorizontal, LayoutGrid, List, Heart, UserPlus } from 'lucide-react';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
@@ -9,27 +9,19 @@ import GridView from './grid-view';
 import FilterPanel from './filter-panel';
 
 export default function DiscoverScreen() {
-  const { discoverMode, setDiscoverMode, discoverIntent, setDiscoverIntent, showFilters, setShowFilters, tickOnlineStatus } = useKinzolaStore();
+  const { discoverMode, setDiscoverMode, discoverIntent, setDiscoverIntent, showFilters, setShowFilters } = useKinzolaStore();
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Real-time online status updates every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      tickOnlineStatus();
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [tickOnlineStatus]);
 
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="p-5 pb-3">
+      <div className="p-4 pb-2">
         {/* Logo + Slogan - top left */}
-        <div className="flex items-center gap-3 mb-3">
+        <div className="flex items-center gap-2 mb-2">
           <img
             src="/kinzola-logo.png"
             alt="Kinzola"
-            className="h-9 w-auto object-contain"
+            className="h-7 w-auto object-contain"
           />
           <span
             className="text-[11px] font-medium tracking-wide"
@@ -43,7 +35,7 @@ export default function DiscoverScreen() {
           </span>
         </div>
 
-        <div className="flex items-center gap-3 mb-3">
+        <div className="flex items-center gap-2 mb-2">
           {/* Search bar - glass, rounded-full */}
           <div className="flex-1 relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-kinzola-muted" />

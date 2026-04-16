@@ -1,117 +1,142 @@
-// ─── Kinzola Service Worker — Push Notifications ───
+// ═══════════════════════════════════════════════════════════════════════════
+//  Kinzola Service Worker — Background push notifications with actions
+//  Handles: notificationclick with action buttons (Répondre, Marqué comme lu, Silence)
+// ═══════════════════════════════════════════════════════════════════════════
 
-const KINZOLA_CACHE = 'kinzola-v2';
+const CACHE_NAME = 'kinzola-v1';
 
-// Install: cache shell assets
+// Install — pre-cache essential assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(KINZOLA_CACHE).then((cache) => {
+    caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll([
         '/',
+        '/favicon.ico',
         '/kinzola-logo.png',
-        '/logo.svg',
-      ]);
+      ]).catch(() => {});
     })
   );
   self.skipWaiting();
 });
 
-// Activate: clean old caches
+// Activate — clean old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(
-        keys.filter((key) => key !== KINZOLA_CACHE).map((key) => caches.delete(key))
-      )
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
     )
   );
   self.clients.claim();
 });
 
-// Fetch: network-first with cache fallback
+// Fetch — network-first strategy
 self.addEventListener('fetch', (event) => {
-  // Skip non-GET
-  if (event.request.method !== 'GET') return;
-
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Cache successful responses
-        if (response.ok) {
-          const clone = response.clone();
-          caches.open(KINZOLA_CACHE).then((cache) => {
-            cache.put(event.request, clone);
-          });
-        }
+        const responseClone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
         return response;
       })
-      .catch(() => {
-        // Fallback to cache
-        return caches.match(event.request).then((cached) => {
-          if (cached) return cached;
-          // If navigating, return cached index
-          if (event.request.mode === 'navigate') {
-            return caches.match('/');
-          }
-          return new Response('Offline', { status: 503 });
-        });
-      })
+      .catch(() => caches.match(event.request))
   );
 });
 
-// ─── Push Notification Handler ───
+// ═══════════════════════════════════════════════════════════════════════════
+//  Push event handler (for future real push notifications)
+// ═══════════════════════════════════════════════════════════════════════════
 self.addEventListener('push', (event) => {
-  let data = {
-    title: 'Kinzola',
-    body: 'Vous avez une nouvelle notification',
-    icon: '/kinzola-logo.png',
-    badge: '/kinzola-logo.png',
-    tag: 'kinzola-notification',
-    data: {
-      url: '/',
-    },
-  };
+  if (!event.data) return;
 
-  if (event.data) {
-    try {
-      const parsed = JSON.parse(event.data.text());
-      data = { ...data, ...parsed };
-    } catch (e) {
-      // If not JSON, use text as body
-      data.body = event.data.text();
-    }
+  try {
+    const data = event.data.json();
+    const { title, body, icon, tag, conversationId, participantName } = data;
+
+    event.waitUntil(
+      self.registration.showNotification(title, {
+        body: body || '',
+        icon: icon || '/favicon.ico',
+        badge: '/favicon.ico',
+        tag: tag || `kinzola-msg-${Date.now()}`,
+        renotify: true,
+        requireInteraction: true,
+        silent: true,
+        vibrate: [200, 100, 200],
+        data: { conversationId, participantName },
+        actions: [
+          { action: 'reply', title: 'Répondre' },
+          { action: 'mark-read', title: 'Marqué comme lu' },
+          { action: 'silence', title: 'Silence' },
+        ],
+      })
+    );
+  } catch (e) {
+    // Fallback: show simple notification
+    const body = event.data.text();
+    event.waitUntil(
+      self.registration.showNotification('Kinzola', {
+        body: body || 'Nouveau message',
+        icon: '/favicon.ico',
+        silent: true,
+        vibrate: [200, 100, 200],
+      })
+    );
   }
-
-  event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: data.icon,
-      badge: data.badge,
-      tag: data.tag || 'kinzola-notification',
-      silent: true,
-      data: data.data || {},
-      actions: data.actions || [],
-    })
-  );
 });
 
-// ─── Notification Click Handler ───
+// ═══════════════════════════════════════════════════════════════════════════
+//  Notification click handler — handles action buttons
+// ═══════════════════════════════════════════════════════════════════════════
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
-  const urlToOpen = event.notification.data?.url || '/';
+  const action = event.action;
+  const data = event.notification.data || {};
+  const { conversationId, participantName } = data;
 
-  event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // If app is already open, focus it
-      for (const client of clientList) {
-        if (client.url.includes(self.location.origin) && 'focus' in client) {
-          client.navigate(urlToOpen);
-          return client.focus();
+  if (action === 'silence') {
+    // Just close the notification — already done above
+    return;
+  }
+
+  if (action === 'mark-read') {
+    // Focus the window and dispatch mark-read event
+    event.waitUntil(
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+        if (clients.length > 0) {
+          const client = clients[0];
+          client.focus();
+          client.postMessage({
+            type: 'NOTIFICATION_ACTION',
+            action: 'mark-read',
+            conversationId,
+          });
         }
+      })
+    );
+    return;
+  }
+
+  // Default action (click on notification body) or 'reply'
+  // Focus window and open chat / show reply input
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      if (clients.length > 0) {
+        const client = clients[0];
+        client.focus();
+        client.postMessage({
+          type: 'NOTIFICATION_ACTION',
+          action: action === 'reply' ? 'reply' : 'open-chat',
+          conversationId,
+          participantName,
+        });
+      } else {
+        // No open windows — open a new one
+        const url = action === 'reply'
+          ? `/?action=reply&conv=${conversationId}&name=${encodeURIComponent(participantName || '')}`
+          : `/?action=open-chat&conv=${conversationId}`;
+        self.clients.openWindow(url);
       }
-      // Otherwise open new window
-      return self.clients.openWindow(urlToOpen);
     })
   );
 });
