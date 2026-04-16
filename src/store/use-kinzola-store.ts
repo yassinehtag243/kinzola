@@ -715,6 +715,21 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
         fromUserName: conv.participant.name,
         fromUserPhoto: conv.participant.photoUrl,
       });
+
+      // Direct browser notification for incoming message
+      try {
+        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+          const notif = new Notification(`💬 ${conv.participant.name}`, {
+            body: replyContent,
+            icon: '/favicon.ico',
+            tag: `kinzola-msg-${Date.now()}`,
+            renotify: true,
+            vibrate: [200, 100, 200],
+          });
+          notif.onclick = () => { window.focus(); notif.close(); };
+          setTimeout(() => notif.close(), 5000);
+        }
+      } catch {}
     }, delay);
   },
 

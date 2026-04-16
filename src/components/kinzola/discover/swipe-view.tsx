@@ -154,9 +154,9 @@ export default function SwipeView() {
   };
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-4 pb-4">
-      {/* Card stack - LARGE cards */}
-      <div ref={stackRef} className="relative w-full max-w-md" style={{ height: 'min(65vh, 520px)' }}>
+    <div className="flex-1 flex flex-col items-center justify-center px-4 pb-2">
+      {/* Card stack */}
+      <div ref={stackRef} className="relative w-full max-w-md" style={{ height: 'min(55vh, 430px)' }}>
         {[...visibleProfiles].reverse().map((profile, index) => {
           const stackIndex = visibleProfiles.length - 1 - index;
           return (
@@ -180,57 +180,60 @@ export default function SwipeView() {
             <ChevronRight className="w-5 h-5 text-white" />
           </button>
         )}
-      </div>
 
-      {/* Action Buttons */}
-      <div className="flex items-center gap-5 mt-6">
-        {/* Pass - red glass, 56px circle */}
-        <motion.button
-          whileTap={{ scale: 0.85 }}
-          onClick={() => handleSwipe('left')}
-          className="w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-105"
-          style={{
-            background: 'rgba(15, 25, 50, 0.6)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-          }}
-        >
-          <X className="w-7 h-7 text-red-400" />
-        </motion.button>
+        {/* Action Buttons - OVERLAID on bottom of card */}
+        <div className="absolute bottom-4 left-0 right-0 z-30 flex items-center justify-center gap-4">
+          {/* Pass */}
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            onClick={() => handleSwipe('left')}
+            className="w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300"
+            style={{
+              background: 'rgba(10, 20, 40, 0.7)',
+              backdropFilter: 'blur(20px)',
+              border: '1.5px solid rgba(239, 68, 68, 0.4)',
+              boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+            }}
+          >
+            <X className="w-6 h-6 text-red-400" />
+          </motion.button>
 
-        {/* Star - blue glass, 48px circle */}
-        <motion.button
-          whileTap={{ scale: 0.85 }}
-          onClick={() => handleSwipe('up')}
-          className="w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-105"
-          style={{
-            background: 'rgba(15, 25, 50, 0.6)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(43, 127, 255, 0.3)',
-          }}
-        >
-          <Star className="w-6 h-6 text-kinzola-blue" />
-        </motion.button>
+          {/* Star / Super Like */}
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            onClick={() => handleSwipe('up')}
+            className="w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300"
+            style={{
+              background: 'rgba(10, 20, 40, 0.7)',
+              backdropFilter: 'blur(20px)',
+              border: '1.5px solid rgba(43, 127, 255, 0.4)',
+              boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+            }}
+          >
+            <Star className="w-5 h-5 text-kinzola-blue" />
+          </motion.button>
 
-        {/* Amitié / Amour - dynamic action button, 56px circle */}
-        <motion.button
-          whileTap={{ scale: 0.85 }}
-          onClick={() => handleSwipe('right')}
-          className="w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-105"
-          style={{
-            background: discoverIntent === 'amitie'
-              ? 'linear-gradient(135deg, #2B7FFF, #1B8FFF)'
-              : 'linear-gradient(135deg, #2B7FFF, #FF4D8D)',
-            boxShadow: discoverIntent === 'amitie'
-              ? '0 0 30px rgba(43, 127, 255, 0.4)'
-              : '0 0 30px rgba(255, 77, 141, 0.4)',
-          }}
-        >
-          {discoverIntent === 'amitie'
-            ? <UserPlus className="w-7 h-7 text-white" />
-            : <Heart className="w-7 h-7 text-white fill-white" />
-          }
-        </motion.button>
+          {/* Like / Amitié */}
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            onClick={() => handleSwipe('right')}
+            className="w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300"
+            style={{
+              background: discoverIntent === 'amitie'
+                ? 'linear-gradient(135deg, #2B7FFF, #1B8FFF)'
+                : 'linear-gradient(135deg, #2B7FFF, #FF4D8D)',
+              boxShadow: discoverIntent === 'amitie'
+                ? '0 0 25px rgba(43, 127, 255, 0.5)'
+                : '0 0 25px rgba(255, 77, 141, 0.5)',
+              border: 'none',
+            }}
+          >
+            {discoverIntent === 'amitie'
+              ? <UserPlus className="w-6 h-6 text-white" />
+              : <Heart className="w-6 h-6 text-white fill-white" />
+            }
+          </motion.button>
+        </div>
       </div>
     </div>
   );

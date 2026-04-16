@@ -27,7 +27,7 @@ export default function FilterPanel() {
     if (selectedCities.length > 0) count = count.filter(p => selectedCities.includes(p.city));
     if (selectedReligions.length > 0) count = count.filter(p => selectedReligions.includes(p.religion));
     return count.length;
-  }, [localFilters, selectedCities, selectedReligions, selectedInterests, swipedProfileIds]);
+  }, [localFilters, selectedCities, selectedReligions, selectedInterests]);
 
   const toggleCity = (city: string) => {
     setSelectedCities(prev =>
@@ -350,4 +350,4 @@ export default function FilterPanel() {
       </div>
     </motion.div>
   );
-        }
+}
