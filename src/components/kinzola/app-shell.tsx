@@ -66,10 +66,44 @@ export default function AppShell() {
     hydrate,
     isAuthenticated,
     startRandomMessages,
+    setTab,
+    openChat,
+    markConversationRead,
+    setPendingNotificationReply,
   } = useKinzolaStore();
 
   // Browser push notifications (real phone notifications)
   useBrowserNotifications();
+
+  // Listen for Service Worker messages (notification actions)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+
+    const handleMessage = (event: MessageEvent) => {
+      const data = event.data;
+      if (!data || data.type !== 'NOTIFICATION_ACTION') return;
+
+      const { action, conversationId, participantName } = data;
+
+      if (action === 'reply') {
+        // Open chat and set focus for reply
+        setTab('messages');
+        openChat(conversationId);
+        setPendingNotificationReply({ conversationId, participantName: participantName || '' });
+      } else if (action === 'mark-read') {
+        markConversationRead(conversationId);
+        setTab('messages');
+      } else if (action === 'open-chat') {
+        setTab('messages');
+        openChat(conversationId);
+      }
+    };
+
+    navigator.serviceWorker.addEventListener('message', handleMessage);
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', handleMessage);
+    };
+  }, [setTab, openChat, markConversationRead, setPendingNotificationReply]);
 
   // ✅ Hydration-safe mounted pattern
   // Avant mounted: SSR et client rendent les mêmes valeurs par défaut

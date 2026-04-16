@@ -182,6 +182,9 @@ interface KinzolaState {
   mutedConversationIds: string[];
   reports: Array<{ id: string; targetUserId: string; reason: string; createdAt: string }>;
 
+  // Notification Reply
+  pendingNotificationReply: { conversationId: string; participantName: string } | null;
+
   // Actions - Navigation
   setScreen: (screen: ScreenType) => void;
   setTab: (tab: TabType) => void;
@@ -250,6 +253,7 @@ interface KinzolaState {
   muteConversation: (conversationId: string) => void;
   unmuteConversation: (conversationId: string) => void;
   markConversationRead: (conversationId: string) => void;
+  setPendingNotificationReply: (data: { conversationId: string; participantName: string } | null) => void;
   reportUser: (targetUserId: string, reason: string) => void;
   markAllNotificationsRead: () => void;
   markNotificationRead: (notifId: string) => void;
@@ -313,6 +317,7 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
   blockedUserIds: [],
   mutedConversationIds: [],
   reports: [],
+  pendingNotificationReply: null,
   superLikesRemaining: 5,
   totalLikesReceived: 24,
   totalViews: 156,
@@ -721,18 +726,34 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
         fromUserPhoto: conv.participant.photoUrl,
       });
 
-      // Direct browser notification for incoming message
+      // Rich browser notification via Service Worker for incoming message
       try {
         if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-          const notif = new Notification(`💬 ${conv.participant.name}`, {
-            body: replyContent,
-            icon: '/favicon.ico',
-            tag: `kinzola-msg-${Date.now()}`,
-            renotify: true,
-            vibrate: [200, 100, 200],
-          });
-          notif.onclick = () => { window.focus(); notif.close(); };
-          setTimeout(() => notif.close(), 5000);
+          if ('serviceWorker' in navigator && navigator.serviceWorker) {
+            navigator.serviceWorker.ready.then((reg) => {
+              reg.showNotification(`💬 ${conv.participant.name}`, {
+                body: replyContent,
+                icon: '/favicon.ico',
+                badge: '/favicon.ico',
+                vibrate: [200, 100, 200],
+                tag: `kinzola-msg-${conversationId}-${Date.now()}`,
+                renotify: true,
+                requireInteraction: true,
+                data: { conversationId, participantName: conv.participant.name },
+                actions: [
+                  { action: 'reply', title: 'Répondre' },
+                  { action: 'mark-read', title: 'Marqué comme lu' },
+                  { action: 'silence', title: 'Silence' },
+                ],
+              });
+            }).catch(() => {
+              const n = new Notification(`💬 ${conv.participant.name}`, { body: replyContent, icon: '/favicon.ico' });
+              setTimeout(() => { n.close(); }, 5000);
+            });
+          } else {
+            const n = new Notification(`💬 ${conv.participant.name}`, { body: replyContent, icon: '/favicon.ico' });
+            setTimeout(() => { n.close(); }, 5000);
+          }
         }
       } catch {}
 
@@ -817,18 +838,34 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
           audio.play().catch(() => {});
         } catch {}
 
-        // Direct browser notification for random incoming message
+        // Rich browser notification via Service Worker for random incoming message
         try {
           if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-            const notif = new Notification(`💬 ${randomConv.participant.name}`, {
-              body: content,
-              icon: '/favicon.ico',
-              tag: `kinzola-msg-${Date.now()}`,
-              renotify: true,
-              vibrate: [200, 100, 200],
-            });
-            notif.onclick = () => { window.focus(); notif.close(); };
-            setTimeout(() => notif.close(), 5000);
+            if ('serviceWorker' in navigator && navigator.serviceWorker) {
+              navigator.serviceWorker.ready.then((reg) => {
+                reg.showNotification(`💬 ${randomConv.participant.name}`, {
+                  body: content,
+                  icon: '/favicon.ico',
+                  badge: '/favicon.ico',
+                  vibrate: [200, 100, 200],
+                  tag: `kinzola-msg-${randomConv.id}-${Date.now()}`,
+                  renotify: true,
+                  requireInteraction: true,
+                  data: { conversationId: randomConv.id, participantName: randomConv.participant.name },
+                  actions: [
+                    { action: 'reply', title: 'Répondre' },
+                    { action: 'mark-read', title: 'Marqué comme lu' },
+                    { action: 'silence', title: 'Silence' },
+                  ],
+                });
+              }).catch(() => {
+                const n = new Notification(`💬 ${randomConv.participant.name}`, { body: content, icon: '/favicon.ico' });
+                setTimeout(() => { n.close(); }, 5000);
+              });
+            } else {
+              const n = new Notification(`💬 ${randomConv.participant.name}`, { body: content, icon: '/favicon.ico' });
+              setTimeout(() => { n.close(); }, 5000);
+            }
           }
         } catch {}
 
@@ -1087,6 +1124,9 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
       c.id === conversationId ? { ...c, unreadCount: 0 } : c
     );
     set({ conversations: updatedConvs });
+  },
+  setPendingNotificationReply: (data) => {
+    set({ pendingNotificationReply: data });
   },
   reportUser: (targetUserId, reason) => {
     const { reports } = get();

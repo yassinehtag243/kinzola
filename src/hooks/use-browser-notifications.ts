@@ -6,11 +6,8 @@ import { useKinzolaStore } from '@/store/use-kinzola-store';
 /**
  * useBrowserNotifications
  *
- * Uses the Web Notification API to show real push-like notifications
- * on the phone when:
- *  - A new match occurs
- *  - An incoming message arrives
- *  - A new like/interest notification comes in
+ * Uses the Web Notification API via Service Worker to show rich push-like
+ * notifications with action buttons (Répondre, Marqué comme lu, Silence).
  *
  * These appear in the phone's notification center (Android/iOS) when the app
  * is installed as a PWA or running in the browser.
@@ -49,25 +46,40 @@ export function useBrowserNotifications() {
     if (Notification.permission !== 'granted') return;
 
     try {
-      const notif = new Notification(title, {
-        icon: '/favicon.ico',
-        badge: '/favicon.ico',
-        vibrate: [200, 100, 200],
-        tag: 'kinzola-' + Date.now(),
-        renotify: true,
-        ...options,
-      });
-
-      // Auto-close after 5 seconds
-      setTimeout(() => {
-        notif.close();
-      }, 5000);
-
-      // Click on notification -> focus the window/tab
-      notif.onclick = () => {
-        window.focus();
-        notif.close();
-      };
+      // Use Service Worker for rich notifications with actions
+      if ('serviceWorker' in navigator && navigator.serviceWorker) {
+        navigator.serviceWorker.ready.then((reg) => {
+          reg.showNotification(title, {
+            icon: '/favicon.ico',
+            badge: '/favicon.ico',
+            vibrate: [200, 100, 200],
+            tag: 'kinzola-' + Date.now(),
+            renotify: true,
+            requireInteraction: true,
+            ...options,
+          });
+        }).catch(() => {
+          // Fallback to basic Notification if SW not ready
+          const notif = new Notification(title, {
+            icon: '/favicon.ico',
+            vibrate: [200, 100, 200],
+            tag: 'kinzola-' + Date.now(),
+            renotify: true,
+            ...options,
+          });
+          setTimeout(() => { notif.close(); }, 5000);
+        });
+      } else {
+        // No Service Worker — fallback to basic Notification
+        const notif = new Notification(title, {
+          icon: '/favicon.ico',
+          vibrate: [200, 100, 200],
+          tag: 'kinzola-' + Date.now(),
+          renotify: true,
+          ...options,
+        });
+        setTimeout(() => { notif.close(); }, 5000);
+      }
     } catch {
       // Notification API might fail in some contexts (iframe, etc.)
     }
@@ -94,4 +106,51 @@ export function useBrowserNotifications() {
   }, [notifications, showNotification]);
 
   return { showNotification };
+}
+
+/**
+ * Show a rich push notification via Service Worker with reply, mark-read, and silence actions.
+ * This function can be called from anywhere (store, hooks, etc.) and uses the SW for
+ * proper action button support.
+ */
+export function showMessageNotification(
+  title: string,
+  body: string,
+  conversationId: string,
+  participantName: string,
+  icon?: string,
+) {
+  if (typeof window === 'undefined' || !('Notification' in window)) return;
+  if (Notification.permission !== 'granted') return;
+
+  try {
+    if ('serviceWorker' in navigator && navigator.serviceWorker) {
+      navigator.serviceWorker.ready.then((reg) => {
+        reg.showNotification(title, {
+          body,
+          icon: icon || '/favicon.ico',
+          badge: '/favicon.ico',
+          vibrate: [200, 100, 200],
+          tag: `kinzola-msg-${conversationId}-${Date.now()}`,
+          renotify: true,
+          requireInteraction: true,
+          data: { conversationId, participantName },
+          actions: [
+            { action: 'reply', title: 'Répondre' },
+            { action: 'mark-read', title: 'Marqué comme lu' },
+            { action: 'silence', title: 'Silence' },
+          ],
+        });
+      }).catch(() => {
+        // Fallback
+        const notif = new Notification(title, { body, icon: icon || '/favicon.ico' });
+        setTimeout(() => { notif.close(); }, 5000);
+      });
+    } else {
+      const notif = new Notification(title, { body, icon: icon || '/favicon.ico' });
+      setTimeout(() => { notif.close(); }, 5000);
+    }
+  } catch {
+    // silent fail
+  }
 }

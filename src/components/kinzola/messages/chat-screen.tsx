@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, memo } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import {
   MoreVertical, ArrowLeft, Phone, Video, Flag, Ban, Play, Pause, X, Download,
@@ -12,6 +12,7 @@ import { formatLastSeen } from '@/lib/format-time';
 import type { Message, Conversation } from '@/types';
 import ChatInputBar from './chat-input-bar';
 import ChatContactDetail from './chat-contact-detail';
+import StoryViewerModal from './story-viewer-modal';
 
 // ─── Stable animation constants (no Math.random in render) ───
 const VOICE_WAVEFORM = [4, 8, 14, 10, 6, 12, 16, 8, 4, 10, 14, 6, 8, 12, 16, 10, 4, 14, 8, 6, 12, 10, 8, 4];
@@ -724,6 +725,7 @@ export default function ChatScreen() {
   const blockedUserIds = useKinzolaStore((s) => s.blockedUserIds);
   const simulateReply = useKinzolaStore((s) => s.simulateReply);
   const unblockUser = useKinzolaStore((s) => s.unblockUser);
+  const storeStories = useKinzolaStore((s) => s.stories);
 
   // ─── Local state ───
   const [showMenu, setShowMenu] = useState(false);
@@ -739,6 +741,7 @@ export default function ChatScreen() {
   const [swipedMessageId, setSwipedMessageId] = useState<string | null>(null);
   const [showForwardPicker, setShowForwardPicker] = useState(false);
   const [messageReactions, setMessageReactions] = useState<Record<string, string>>({});
+  const [viewingStoryUserId, setViewingStoryUserId] = useState<string | null>(null);
 
   // ─── Derived values ───
   const conversation = conversations.find((c) => c.id === currentChatId);
@@ -749,6 +752,13 @@ export default function ChatScreen() {
   const displayName = customNicknames[conversationId] || participant.name;
   const lastMsgId = messages.length > 0 ? messages[messages.length - 1].id : '';
   const isUserBlocked = participant ? blockedUserIds.includes(participant.userId) : false;
+
+  // Check if this participant has stories
+  const participantStories = useMemo(() => {
+    if (!participant) return [];
+    return storeStories.filter((s) => s.authorId === participant.userId);
+  }, [participant, storeStories]);
+  const hasStory = participantStories.length > 0;
 
   // ─── Refs ───
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -1110,8 +1120,28 @@ export default function ChatScreen() {
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div className="flex-1 flex items-center gap-3 min-w-0">
-          <button className="relative flex-shrink-0 cursor-pointer" onClick={() => setShowChatContactDetail(true)}>
-            <img src={participant.photoUrl} alt={participant.name} className="w-10 h-10 rounded-full object-cover" />
+          <button className="relative flex-shrink-0 cursor-pointer" onClick={() => {
+              if (hasStory) {
+                setViewingStoryUserId(participant.userId);
+              } else {
+                setShowChatContactDetail(true);
+              }
+            }}>
+            {hasStory ? (
+              <div
+                className="w-10 h-10 rounded-full p-[2px]"
+                style={{
+                  background: 'linear-gradient(135deg, #FF4D8D, #FFD700, #2B7FFF, #FF4D8D)',
+                  boxShadow: '0 0 10px rgba(255, 77, 141, 0.4)',
+                }}
+              >
+                <div className="w-full h-full rounded-full overflow-hidden">
+                  <img src={participant.photoUrl} alt={participant.name} className="w-full h-full object-cover" />
+                </div>
+              </div>
+            ) : (
+              <img src={participant.photoUrl} alt={participant.name} className="w-10 h-10 rounded-full object-cover" />
+            )}
             {online ? (
               <motion.div className="absolute -bottom-1 -right-1 w-[20px] h-[20px] rounded-full flex items-center justify-center" style={{ background: onlineDotBorder }}
                 animate={{ scale: [1, 1.2, 1], boxShadow: ['0 0 4px rgba(255,45,111,0.3)', '0 0 12px rgba(255,45,111,0.7)', '0 0 4px rgba(255,45,111,0.3)'] }}
@@ -1317,6 +1347,17 @@ export default function ChatScreen() {
       {/* ─── Chat Contact Detail Overlay ─── */}
       <AnimatePresence>
         <ChatContactDetail />
+      </AnimatePresence>
+
+      {/* ─── Story Viewer Modal ─── */}
+      <AnimatePresence>
+        {viewingStoryUserId && (
+          <StoryViewerModal
+            key={`chat-story-${viewingStoryUserId}`}
+            userId={viewingStoryUserId}
+            onClose={() => setViewingStoryUserId(null)}
+          />
+        )}
       </AnimatePresence>
     </motion.div>
   );

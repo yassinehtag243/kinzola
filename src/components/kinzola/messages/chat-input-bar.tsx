@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Smile, Mic, Send, Camera, Trash2, Loader2 } from 'lucide-react';
 import { usePermission, PermissionModal, PermissionDeniedBanner, PermissionToast } from './permission-manager';
 import dynamic from 'next/dynamic';
+import { useKinzolaStore } from '@/store/use-kinzola-store';
 
 const EmojiPickerReact = dynamic(() => import('./emoji-picker-react'), { ssr: false });
 
@@ -40,6 +41,8 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 }
 
 export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendImage }: ChatInputBarProps) {
+  const pendingNotificationReply = useKinzolaStore((s) => s.pendingNotificationReply);
+  const setPendingNotificationReply = useKinzolaStore((s) => s.setPendingNotificationReply);
   const [message, setMessage] = useState('');
   const [showEmoji, setShowEmoji] = useState(false);
   const [showPhotoMenu, setShowPhotoMenu] = useState(false);
@@ -105,6 +108,18 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
       }
     };
   }, []);
+
+  // Auto-focus input when notification reply is triggered
+  useEffect(() => {
+    if (pendingNotificationReply) {
+      // Small delay to ensure chat screen is fully rendered
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+        setPendingNotificationReply(null);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [pendingNotificationReply, setPendingNotificationReply]);
 
   // ─── Handle permission grant ───
   useEffect(() => {
