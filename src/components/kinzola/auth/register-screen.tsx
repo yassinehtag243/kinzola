@@ -7,13 +7,15 @@ import {
   Camera, Plus, X, CheckCircle2, ShieldCheck, Lock, Eye, EyeOff
 } from 'lucide-react';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
+import { useAuth } from '@/lib/supabase/auth-context';
 import { AVAILABLE_RELIGIONS } from '@/lib/mock-data';
 import CityInput from '@/components/kinzola/shared/city-input';
 
 type RegisterMethod = 'phone' | 'email';
 
 export default function RegisterScreen() {
-  const { setScreen, register, registerStep, setRegisterStep } = useKinzolaStore();
+  const { setScreen, registerStep, setRegisterStep } = useKinzolaStore();
+  const { register: supabaseRegister } = useAuth();
 
   const [method, setMethod] = useState<RegisterMethod>('phone');
 
@@ -43,7 +45,15 @@ export default function RegisterScreen() {
   const [sendingCode, setSendingCode] = useState(false);
   const [verifying, setVerifying] = useState(false);
 
-  // Email method state
+  // Phone password (needed for Supabase auth even with phone method)
+  const [phonePassword, setPhonePassword] = useState('');
+  const [phoneConfirmPassword, setPhoneConfirmPassword] = useState('');
+  const [showPhonePassword, setShowPhonePassword] = useState(false);
+  const [showPhoneConfirmPassword, setShowPhoneConfirmPassword] = useState(false);
+
+  // Register error/loading state
+  const [registerError, setRegisterError] = useState('');
+  const [registering, setRegistering] = useState(false);
   const [emailVerified, setEmailVerified] = useState(false);
   const [emailVerifying, setEmailVerifying] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -65,8 +75,13 @@ export default function RegisterScreen() {
     setCountdown(0);
     setSendingCode(false);
     setVerifying(false);
+    setPhonePassword('');
+    setPhoneConfirmPassword('');
+    setShowPhonePassword(false);
+    setShowPhoneConfirmPassword(false);
     setEmailVerified(false);
     setEmailVerifying(false);
+    setRegisterError('');
     setForm(prev => ({ ...prev, password: '', confirmPassword: '' }));
     setErrors({});
   };
@@ -201,11 +216,9 @@ export default function RegisterScreen() {
     if (Object.keys(newErrors).length > 0) return;
 
     setEmailVerifying(true);
-    // Mock: simulate sending verification email
-    setTimeout(() => {
-      setEmailVerified(true);
-      setEmailVerifying(false);
-    }, 1200);
+    // Local validation only — no mock setTimeout
+    setEmailVerified(true);
+    setEmailVerifying(false);
   };
 
   const validateStep = (step: number): boolean => {
@@ -214,6 +227,18 @@ export default function RegisterScreen() {
       if (method === 'phone') {
         if (!otpVerified) {
           newErrors.phone = 'Veuillez vérifier votre numéro de téléphone';
+        }
+        if (!phonePassword.trim()) {
+          newErrors.phonePassword = 'Mot de passe requis';
+        } else if (phonePassword.length < 8) {
+          newErrors.phonePassword = 'Le mot de passe doit contenir au moins 8 caractères';
+        } else if (!/[a-zA-Z]/.test(phonePassword)) {
+          newErrors.phonePassword = 'Le mot de passe doit contenir au moins une lettre';
+        } else if (!/[0-9]/.test(phonePassword)) {
+          newErrors.phonePassword = 'Le mot de passe doit contenir au moins un chiffre';
+        }
+        if (phonePassword !== phoneConfirmPassword) {
+          newErrors.phoneConfirmPassword = 'Les mots de passe ne correspondent pas';
         }
       } else {
         if (!emailVerified) {
@@ -241,21 +266,73 @@ export default function RegisterScreen() {
     else setScreen('welcome');
   };
 
-  const handleRegister = () => {
-    register({
-      phone: form.phone || undefined,
-      email: form.email || undefined,
-      name: form.name,
-      age: parseInt(form.age) || 25,
-      gender: form.gender as 'homme' | 'femme',
-      city: form.city,
-      profession: form.profession,
-      religion: form.religion,
-      bio: form.bio,
-      interests: form.interests,
-      photoUrl: form.profilePhoto || undefined,
-      photoGallery: form.galleryPhotos.length > 0 ? form.galleryPhotos : undefined,
-    });
+  const handleRegister = async () => {
+    setRegisterError('');
+    setRegistering(true);
+    try {
+      if (method === 'email') {
+        // Email registration
+        const result = await supabaseRegister({
+          email: form.email,
+          password: form.password,
+          pseudo: form.name,
+          name: form.name,
+          age: parseInt(form.age) || 25,
+          gender: form.gender as 'homme' | 'femme',
+          city: form.city,
+          profession: form.profession,
+          religion: form.religion,
+          bio: form.bio,
+        });
+        if (result.error) {
+          const msg = result.error.message;
+          if (msg.includes('already registered') || msg.includes('already in use')) {
+            setRegisterError('Cette adresse e-mail est déjà utilisée');
+          } else if (msg.includes('Password')) {
+            setRegisterError('Le mot de passe ne respecte pas les critères de sécurité');
+          } else {
+            setRegisterError(msg || 'Erreur lors de l\'inscription. Veuillez réessayer');
+          }
+          setRegistering(false);
+          return;
+        }
+        // On success, AuthProvider + AppShell sync will handle Zustand update and navigation
+      } else {
+        // Phone registration — generate email from phone
+        const cleanPhone = form.phone.replace(/[^\d+]/g, '');
+        const generatedEmail = `${cleanPhone}@kinzola.app`;
+        const result = await supabaseRegister({
+          email: generatedEmail,
+          password: phonePassword,
+          pseudo: form.name,
+          name: form.name,
+          age: parseInt(form.age) || 25,
+          gender: form.gender as 'homme' | 'femme',
+          city: form.city,
+          phone: form.phone,
+          profession: form.profession,
+          religion: form.religion,
+          bio: form.bio,
+        });
+        if (result.error) {
+          const msg = result.error.message;
+          if (msg.includes('already registered') || msg.includes('already in use')) {
+            setRegisterError('Ce numéro de téléphone est déjà utilisé');
+          } else if (msg.includes('Password')) {
+            setRegisterError('Le mot de passe ne respecte pas les critères de sécurité');
+          } else {
+            setRegisterError(msg || 'Erreur lors de l\'inscription. Veuillez réessayer');
+          }
+          setRegistering(false);
+          return;
+        }
+        // On success, AuthProvider + AppShell sync will handle Zustand update and navigation
+      }
+    } catch {
+      setRegisterError('Erreur de connexion. Veuillez vérifier votre connexion internet');
+    } finally {
+      setRegistering(false);
+    }
   };
 
   const quickInterests = ['Technologie', 'Musique', 'Lecture', 'Cuisine', 'Sport', 'Cinéma', 'Voyage', 'Photographie', 'Art', 'Danse'];
@@ -534,25 +611,25 @@ export default function RegisterScreen() {
                           animate={{ opacity: 1, scale: 1 }}
                           exit={{ opacity: 0, scale: 0.8 }}
                           transition={{ duration: 0.5, ease: 'easeOut' }}
-                          className="flex flex-col items-center justify-center py-6 space-y-3"
+                          className="flex flex-col items-center justify-center py-4 space-y-3"
                         >
                           <motion.div
                             initial={{ scale: 0 }}
                             animate={{ scale: 1 }}
                             transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.1 }}
-                            className="w-20 h-20 rounded-full flex items-center justify-center"
+                            className="w-16 h-16 rounded-full flex items-center justify-center"
                             style={{
                               background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(34, 197, 94, 0.05))',
                               border: '2px solid rgba(34, 197, 94, 0.4)',
                             }}
                           >
-                            <CheckCircle2 className="w-10 h-10 text-green-400" />
+                            <CheckCircle2 className="w-8 h-8 text-green-400" />
                           </motion.div>
                           <motion.p
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.3 }}
-                            className="text-lg font-semibold text-green-400"
+                            className="text-base font-semibold text-green-400"
                           >
                             Numéro vérifié !
                           </motion.p>
@@ -567,6 +644,87 @@ export default function RegisterScreen() {
                         </motion.div>
                       )}
                     </AnimatePresence>
+
+                    {/* Phone Password Fields (shown after OTP verified) */}
+                    {otpVerified && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="space-y-4"
+                      >
+                        <p className="text-kinzola-muted text-xs text-center">
+                          Choisissez un mot de passe pour sécuriser votre compte
+                        </p>
+
+                        {/* Password Input */}
+                        <div className="relative">
+                          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-kinzola-muted" />
+                          <input
+                            type={showPhonePassword ? 'text' : 'password'}
+                            placeholder="Mot de passe (min. 8 caractères)"
+                            value={phonePassword}
+                            onChange={(e) => { setPhonePassword(e.target.value); setErrors(prev => ({ ...prev, phonePassword: '' })); }}
+                            className={inputClass}
+                            onFocus={focusInput}
+                            onBlur={blurInput}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPhonePassword(!showPhonePassword)}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-kinzola-muted"
+                          >
+                            {showPhonePassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                          </button>
+                          {errors.phonePassword && <p className="text-red-400 text-xs mt-1 ml-1">{errors.phonePassword}</p>}
+                        </div>
+
+                        {/* Confirm Password Input */}
+                        <div className="relative">
+                          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-kinzola-muted" />
+                          <input
+                            type={showPhoneConfirmPassword ? 'text' : 'password'}
+                            placeholder="Confirmer le mot de passe"
+                            value={phoneConfirmPassword}
+                            onChange={(e) => { setPhoneConfirmPassword(e.target.value); setErrors(prev => ({ ...prev, phoneConfirmPassword: '' })); }}
+                            className={inputClass}
+                            onFocus={focusInput}
+                            onBlur={blurInput}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPhoneConfirmPassword(!showPhoneConfirmPassword)}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-kinzola-muted"
+                          >
+                            {showPhoneConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                          </button>
+                          {errors.phoneConfirmPassword && <p className="text-red-400 text-xs mt-1 ml-1">{errors.phoneConfirmPassword}</p>}
+                        </div>
+
+                        {/* Password strength hint */}
+                        {phonePassword && (
+                          <div className="space-y-1">
+                            <p className="text-[11px] text-kinzola-muted/60">
+                              Votre mot de passe doit contenir :
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {[
+                                { test: phonePassword.length >= 8, label: 'Min. 8 caractères' },
+                                { test: /[a-zA-Z]/.test(phonePassword), label: 'Au moins une lettre' },
+                                { test: /[0-9]/.test(phonePassword), label: 'Au moins un chiffre' },
+                              ].map(({ test, label }) => (
+                                <span
+                                  key={label}
+                                  className={`text-[11px] ${test ? 'text-green-400' : 'text-kinzola-muted/40'}`}
+                                >
+                                  {test ? '✓' : '○'} {label}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
                   </motion.div>
                 )}
 
@@ -979,6 +1137,16 @@ export default function RegisterScreen() {
 
       {/* Bottom Actions */}
       <div className="relative z-10 p-5 pt-2 safe-bottom">
+        {/* Register error toast */}
+        {registerError && (
+          <motion.p
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-sm text-red-400 text-center bg-red-500/10 rounded-xl px-3 py-2 mb-3"
+          >
+            {registerError}
+          </motion.p>
+        )}
         <div className="flex gap-3">
           {registerStep > 1 && (
             <button
@@ -991,13 +1159,16 @@ export default function RegisterScreen() {
           )}
           <button
             onClick={registerStep === 3 ? handleRegister : nextStep}
-            className="flex-[2] h-14 rounded-2xl text-white font-semibold text-lg flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            disabled={registerStep === 3 && registering}
+            className="flex-[2] h-14 rounded-2xl text-white font-semibold text-lg flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               background: 'linear-gradient(135deg, #FF4D8D 0%, #FF2D6D 100%)',
               boxShadow: '0 0 30px rgba(255, 77, 141, 0.4), 0 8px 32px rgba(255, 77, 141, 0.2)',
             }}
           >
-            {registerStep === 3 ? "S'inscrire" : (
+            {registerStep === 3 ? (registering ? (
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : "S'inscrire") : (
               <>
                 Suivant
                 <ArrowRight className="w-4 h-4" />

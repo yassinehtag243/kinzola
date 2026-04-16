@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
+import { useAuth } from '@/lib/supabase/auth-context';
 import WelcomeScreen from './auth/welcome-screen';
 import LoginScreen from './auth/login-screen';
 import RegisterScreen from './auth/register-screen';
@@ -150,6 +151,55 @@ export default function AppShell() {
       navigator.serviceWorker.removeEventListener('message', handleMessage);
     };
   }, [setTab, openChat, markConversationRead, setPendingNotificationReply]);
+
+  // ─── Supabase ↔ Zustand Auth Synchronization ───
+  const { isAuthenticated: supabaseAuthenticated, profile: supabaseProfile, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    if (authLoading) return; // Wait until AuthProvider has finished bootstrap
+
+    if (supabaseAuthenticated && supabaseProfile) {
+      const storeState = useKinzolaStore.getState();
+      // Sync: if Supabase says logged in but Zustand doesn't know yet
+      if (!storeState.isAuthenticated || !storeState.user || storeState.user.id !== supabaseProfile.id) {
+        useKinzolaStore.setState({
+          isAuthenticated: true,
+          user: {
+            id: supabaseProfile.id,
+            pseudo: supabaseProfile.pseudo || '',
+            name: supabaseProfile.pseudo || supabaseProfile.name,
+            email: supabaseProfile.email || '',
+            phone: supabaseProfile.phone || '',
+            age: supabaseProfile.age || 18,
+            gender: (supabaseProfile.gender || 'homme') as 'homme' | 'femme',
+            city: supabaseProfile.city || 'Kinshasa',
+            profession: supabaseProfile.profession || '',
+            religion: supabaseProfile.religion || '',
+            bio: supabaseProfile.bio || '',
+            photoUrl: supabaseProfile.photo_url || '',
+            photoGallery: (supabaseProfile.photo_gallery as string[]) || [],
+            interests: (supabaseProfile.interests as string[]) || [],
+            online: supabaseProfile.online ?? true,
+            verified: supabaseProfile.verified ?? false,
+            preferences: { ageMin: 18, ageMax: 50, city: 'Kinshasa', gender: 'tous', religion: '' },
+            createdAt: supabaseProfile.created_at || new Date().toISOString(),
+          },
+          currentScreen: 'main',
+        });
+      }
+    } else if (!supabaseAuthenticated && !authLoading) {
+      const storeState = useKinzolaStore.getState();
+      // Reset Zustand if Supabase says logged out and Zustand thinks logged in
+      if (storeState.isAuthenticated) {
+        useKinzolaStore.setState({
+          isAuthenticated: false,
+          user: null,
+          currentScreen: 'welcome',
+          currentTab: 'discover',
+        });
+      }
+    }
+  }, [supabaseAuthenticated, supabaseProfile, authLoading]);
 
   // ✅ Hydration-safe mounted pattern
   // Avant mounted: SSR et client rendent les mêmes valeurs par défaut
@@ -337,4 +387,3 @@ export default function AppShell() {
     </div>
   );
 }
-

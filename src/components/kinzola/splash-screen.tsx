@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
+import { supabase } from '@/lib/supabase/client';
 
 /**
  * SplashScreen — écran d'intro avec vidéo sur fond noir.
@@ -24,19 +25,33 @@ export default function SplashScreen() {
   const [visible, setVisible] = useState(true);
 
   // ─── Navigate to the correct screen after splash ───
-  const navigateAway = useCallback(() => {
+  const navigateAway = useCallback(async () => {
     if (navigatedRef.current) return;
     navigatedRef.current = true;
     setStep('exiting');
     setVisible(false);
 
+    // Check Supabase session first (source of truth for auth)
+    let hasSession = false;
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      hasSession = !!sessionData.session;
+    } catch {
+      // If Supabase check fails, fall back to Zustand state
+    }
+
     setTimeout(() => {
-      const { isAuthenticated } = useKinzolaStore.getState();
-      if (isAuthenticated) {
+      if (hasSession) {
         setTab('discover');
         setScreen('main');
       } else {
-        setScreen('welcome');
+        const { isAuthenticated } = useKinzolaStore.getState();
+        if (isAuthenticated) {
+          setTab('discover');
+          setScreen('main');
+        } else {
+          setScreen('welcome');
+        }
       }
     }, 500);
   }, [setScreen, setTab]);

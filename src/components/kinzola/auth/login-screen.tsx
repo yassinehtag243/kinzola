@@ -2,13 +2,15 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Lock, Eye, EyeOff, Phone, Mail, ChevronDown, ChevronUp, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Lock, Eye, EyeOff, Phone, Mail, ShieldCheck } from 'lucide-react';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
+import { useAuth } from '@/lib/supabase/auth-context';
 
 type LoginMethod = 'phone' | 'email';
 
 export default function LoginScreen() {
-  const { setScreen, login } = useKinzolaStore();
+  const { setScreen } = useKinzolaStore();
+  const { login: supabaseLogin } = useAuth();
 
   // Method selection
   const [method, setMethod] = useState<LoginMethod>('phone');
@@ -40,8 +42,8 @@ export default function LoginScreen() {
     setEmailLoggingIn(false);
   };
 
-  // Phone + Password login
-  const handlePhoneLogin = () => {
+  // Phone + Password login → generate email from phone for Supabase
+  const handlePhoneLogin = async () => {
     setError('');
     if (!phone.trim()) {
       setError('Veuillez entrer votre numéro de téléphone');
@@ -56,15 +58,26 @@ export default function LoginScreen() {
       return;
     }
     setPhoneLoggingIn(true);
-    // Mock: simulate login delay
-    setTimeout(() => {
+    try {
+      // Generate a unique email from the phone number for Supabase auth
+      const cleanPhone = phone.replace(/[\s\-\+\(\)]/g, '');
+      const generatedEmail = `${cleanPhone}@kinzola.app`;
+      const result = await supabaseLogin(generatedEmail, password);
+      if (result.error) {
+        setError(result.error.message === 'Invalid login credentials'
+          ? 'Numéro ou mot de passe incorrect'
+          : result.error.message);
+      }
+      // On success, the app-shell sync will update Zustand from Supabase profile
+    } catch (err: any) {
+      setError(err?.message || 'Erreur de connexion');
+    } finally {
       setPhoneLoggingIn(false);
-      login(phone, password);
-    }, 800);
+    }
   };
 
   // Email + Password login
-  const handleEmailLogin = () => {
+  const handleEmailLogin = async () => {
     setError('');
     if (!email.trim()) {
       setError('Veuillez entrer votre adresse e-mail');
@@ -83,11 +96,19 @@ export default function LoginScreen() {
       return;
     }
     setEmailLoggingIn(true);
-    // Mock: simulate login delay
-    setTimeout(() => {
+    try {
+      const result = await supabaseLogin(email, password);
+      if (result.error) {
+        setError(result.error.message === 'Invalid login credentials'
+          ? 'E-mail ou mot de passe incorrect'
+          : result.error.message);
+      }
+      // On success, the app-shell sync will update Zustand from Supabase profile
+    } catch (err: any) {
+      setError(err?.message || 'Erreur de connexion');
+    } finally {
       setEmailLoggingIn(false);
-      login(email, password);
-    }, 800);
+    }
   };
 
   const focusInput = (e: React.FocusEvent<HTMLInputElement>) => {

@@ -24,6 +24,7 @@ export interface RegisterData {
   age: number;
   gender: Gender;
   city: string;
+  phone?: string;
   profession?: string;
   religion?: string;
   bio?: string;
@@ -93,7 +94,7 @@ export async function register(data: RegisterData): Promise<AuthResult> {
       profession: data.profession ?? '',
       religion: data.religion ?? '',
       bio: data.bio ?? '',
-      phone: '',
+      phone: data.phone ?? '',
       photo_url: '',
       photo_gallery: [],
       verified: false,
