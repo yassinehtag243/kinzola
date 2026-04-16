@@ -19,6 +19,7 @@ import React, {
 import type { User, Session } from '@supabase/supabase-js';
 import type { Profile } from '@/lib/supabase/database.types';
 import { supabase } from '@/lib/supabase/client';
+import { useKinzolaStore } from '@/store/use-kinzola-store';
 import {
   register as registerUser,
   login as loginUser,
@@ -150,6 +151,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(result.user);
       setSession(result.session);
       await fetchProfile(result.user.id);
+      // Synchroniser le store Zustand avec les données Supabase
+      useKinzolaStore.getState().fetchAllData().catch(console.error);
     }
     return result;
   }, [fetchProfile]);
@@ -161,6 +164,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(result.user);
       setSession(result.session);
       await fetchProfile(result.user.id);
+      // Synchroniser le store Zustand avec les données Supabase
+      useKinzolaStore.getState().fetchAllData().catch(console.error);
     }
     return result;
   }, [fetchProfile]);
@@ -171,6 +176,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setProfile(null);
     setSession(null);
+    // Nettoyer le store Zustand
+    const store = useKinzolaStore.getState();
+    useKinzolaStore.setState({
+      user: null,
+      isAuthenticated: false,
+      currentScreen: 'welcome',
+      currentTab: 'discover',
+      profiles: [],
+      matches: [],
+      messages: [],
+      conversations: [],
+      posts: [],
+      stories: [],
+      notifications: [],
+      likesReceived: [],
+      profileVisitors: [],
+      blockedUserIds: [],
+    });
   }, []);
 
   // ── Action: updateProfile ──

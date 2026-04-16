@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { MapPin, ChevronDown } from 'lucide-react';
-import { AVAILABLE_CITIES } from '@/lib/mock-data';
+import { AVAILABLE_CITIES } from '@/lib/constants';
 
 interface CityInputProps {
   value: string;

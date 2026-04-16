@@ -4,7 +4,7 @@ import { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Camera, X, Plus } from 'lucide-react';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
-import { AVAILABLE_RELIGIONS, AVAILABLE_INTERESTS } from '@/lib/mock-data';
+import { AVAILABLE_RELIGIONS, AVAILABLE_INTERESTS } from '@/lib/constants';
 import CityInput from '@/components/kinzola/shared/city-input';
 
 export default function EditProfile() {

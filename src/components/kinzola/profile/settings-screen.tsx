@@ -335,17 +335,19 @@ function PasswordChangeModal({ onClose, onToast }: { onClose: () => void; onToas
     if (!user) return;
     setLoading(true);
 
-    // Simulate API delay
-    await new Promise((r) => setTimeout(r, 800));
+    try {
+      const result = await changePassword(user.id, oldPassword, newPassword);
+      setLoading(false);
 
-    const result = changePassword(user.id, oldPassword, newPassword);
-    setLoading(false);
-
-    if (result.success) {
-      onToast('Mot de passe modifié avec succès !', 'success');
-      onClose();
-    } else {
-      setError(result.error);
+      if (result.success) {
+        onToast('Mot de passe modifié avec succès !', 'success');
+        onClose();
+      } else {
+        setError(result.error);
+      }
+    } catch (err: any) {
+      setLoading(false);
+      setError(err?.message || 'Erreur lors du changement de mot de passe');
     }
   };
 

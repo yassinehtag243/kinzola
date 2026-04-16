@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
 import { useAuth } from '@/lib/supabase/auth-context';
-import { AVAILABLE_RELIGIONS } from '@/lib/mock-data';
+import { AVAILABLE_RELIGIONS } from '@/lib/constants';
 import CityInput from '@/components/kinzola/shared/city-input';
 
 type RegisterMethod = 'phone' | 'email';

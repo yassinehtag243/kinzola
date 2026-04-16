@@ -1,6 +1,71 @@
 import { create } from 'zustand';
 import type { ScreenType, TabType, DiscoverMode, User, Profile, Match, Message, Conversation, Post, Story, FilterState, Notification } from '@/types';
-import { CURRENT_USER, MOCK_PROFILES, MOCK_CONVERSATIONS, MOCK_POSTS, MOCK_STORIES, MOCK_MATCHES, MOCK_NOTIFICATIONS, MOCK_LIKES_RECEIVED, MOCK_VISTORS } from '@/lib/mock-data';
+
+// ─── Imports Supabase (services) ────────────────────────────────────────
+import {
+  login as supabaseLogin,
+  register as supabaseRegister,
+  logout as supabaseLogout,
+  getUser as supabaseGetUser,
+  updateProfile as supabaseUpdateProfile,
+  changePassword as supabaseChangePassword,
+} from '@/lib/supabase/auth-service';
+
+import {
+  getConversations,
+  getMessages,
+  sendMessage as supabaseSendMessage,
+  sendReplyMessage as supabaseSendReplyMessage,
+  deleteMessageForMe as supabaseDeleteMessageForMe,
+  toggleMessageImportant as supabaseToggleMessageImportant,
+  markMessagesAsRead,
+  deleteConversation as supabaseDeleteConversation,
+} from '@/lib/supabase/messages-service';
+
+import {
+  getMatches,
+  likeProfile as supabaseLikeProfile,
+  superLikeProfile as supabaseSuperLikeProfile,
+  getBlockedUsers,
+  blockUser as supabaseBlockUser,
+  unblockUser as supabaseUnblockUser,
+  reportUser as supabaseReportUser,
+} from '@/lib/supabase/matches-service';
+
+import {
+  getPosts,
+  createPost as supabaseCreatePost,
+  likePost as supabaseLikePost,
+  addComment as supabaseAddComment,
+  checkPostLiked,
+  getComments,
+} from '@/lib/supabase/posts-service';
+
+import {
+  getNotifications,
+  markNotificationRead as supabaseMarkNotificationRead,
+  markAllNotificationsRead as supabaseMarkAllNotificationsRead,
+  deleteNotification as supabaseDeleteNotification,
+  clearAllNotifications as supabaseClearAllNotifications,
+} from '@/lib/supabase/notifications-service';
+
+import { getDiscoverProfiles } from '@/lib/supabase/discover-service';
+
+// ─── Imports Adapter (DB ↔ Frontend) ─────────────────────────────────────
+import {
+  dbProfileToProfile,
+  dbProfileToUser,
+  dbMessageToMessage,
+  dbConversationToConversation,
+  dbNotificationToNotification,
+  dbMatchToMatch,
+  userProfileToDbUpdate,
+} from '@/lib/supabase/adapter';
+
+import {
+  dbPostToPost,
+  dbCommentToComment,
+} from '@/lib/supabase/adapter';
 
 type DiscoverIntent = 'amitie' | 'amour';
 
@@ -151,9 +216,6 @@ interface KinzolaState {
   // Text Size (in pixels, range 12-24)
   textSize: number;
 
-  // Passwords (simulated per-user, hashed conceptually)
-  userPasswords: Record<string, string>;
-
   // Badge Verification
   badgeStatus: 'none' | 'uploading_id' | 'uploading_selfie' | 'processing' | 'approved' | 'rejected';
   badgeRequestTime: string | null;
@@ -184,6 +246,10 @@ interface KinzolaState {
 
   // Notification Reply
   pendingNotificationReply: { conversationId: string; participantName: string } | null;
+
+  // Async states
+  loading: boolean;
+  error: string | null;
 
   // Actions - Navigation
   setScreen: (screen: ScreenType) => void;
@@ -220,6 +286,7 @@ interface KinzolaState {
   forwardMessageToConversation: (targetConversationId: string, content: string) => void;
   deleteConversation: (conversationId: string) => void;
   simulateReply: (conversationId: string, sentContent: string) => void;
+  startRandomMessages: () => void;
 
   // Actions - Posts
   createPost: (content: string, imageUrl?: string, visibility?: 'public' | 'friends') => void;
@@ -240,7 +307,7 @@ interface KinzolaState {
   hydrate: () => void;
 
   // Actions - Password
-  changePassword: (userId: string, oldPassword: string, newPassword: string) => { success: boolean; error: string };
+  changePassword: (userId: string, oldPassword: string, newPassword: string) => Promise<{ success: boolean; error: string }>;
 
   // Actions - Badge
   setBadgeStatus: (status: 'none' | 'uploading_id' | 'uploading_selfie' | 'processing' | 'approved' | 'rejected') => void;
@@ -273,6 +340,9 @@ interface KinzolaState {
   setShowEditPersonalInfo: (show: boolean) => void;
   setRegisterStep: (step: number) => void;
   updateProfile: (data: Partial<User>) => void;
+
+  // Actions - Data
+  fetchAllData: () => Promise<void>;
 }
 
 const defaultFilters: FilterState = {
@@ -285,20 +355,20 @@ const defaultFilters: FilterState = {
 };
 
 export const useKinzolaStore = create<KinzolaState>((set, get) => ({
-  // Initial State
+  // ─── État initial (vides — données chargées via Supabase) ────────────
   currentScreen: 'welcome',
   currentTab: 'discover',
   previousScreen: null,
   theme: 'dark',
   user: null,
   isAuthenticated: false,
-  profiles: sortProfilesByCompatibility(CURRENT_USER, MOCK_PROFILES),
-  matches: MOCK_MATCHES,
+  profiles: [],
+  matches: [],
   messages: [],
-  conversations: MOCK_CONVERSATIONS,
-  posts: MOCK_POSTS,
-  stories: MOCK_STORIES,
-  notifications: MOCK_NOTIFICATIONS,
+  conversations: [],
+  posts: [],
+  stories: [],
+  notifications: [],
   discoverMode: 'swipe',
   discoverIntent: 'amour',
   currentChatId: null,
@@ -322,16 +392,17 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
   reports: [],
   pendingNotificationReply: null,
   superLikesRemaining: 5,
-  totalLikesReceived: 24,
-  totalViews: 156,
-  likesReceived: MOCK_LIKES_RECEIVED,
-  profileVisitors: MOCK_VISTORS,
-  textSize: 16, // ✅ Hydration-safe: toujours 16 côté SSR, hydraté depuis localStorage côté client
-  userPasswords: { 'user-me': 'Kinzola2024' },
+  totalLikesReceived: 0,
+  totalViews: 0,
+  likesReceived: [],
+  profileVisitors: [],
+  textSize: 16,
   badgeStatus: 'none',
   badgeRequestTime: null,
+  loading: false,
+  error: null,
 
-  // Navigation Actions
+  // ─── Navigation Actions ─────────────────────────────────────────────
   setScreen: (screen) => set((state) => ({ currentScreen: screen, previousScreen: state.currentScreen })),
   setTab: (tab) => set({ currentTab: tab }),
   goBack: () => set((state) => ({
@@ -339,272 +410,458 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
     previousScreen: null,
   })),
 
-  // Auth Actions
-  login: (identifier, _password) => {
-    // identifier can be phone or email — auto-detect
-    const isEmail = identifier.includes('@');
-    const updates: Partial<KinzolaState> = {
-      isAuthenticated: true,
-      currentScreen: 'main',
-      profiles: sortProfilesByCompatibility(CURRENT_USER, MOCK_PROFILES),
-    };
-    if (isEmail) {
-      updates.user = { ...CURRENT_USER, email: identifier };
-    } else {
-      updates.user = { ...CURRENT_USER, phone: identifier };
+  // ─── Auth Actions ───────────────────────────────────────────────────
+  login: async (identifier, password) => {
+    set({ loading: true, error: null });
+    try {
+      // identifier peut être un téléphone → convertir en email@kinzola.app
+      const isEmail = identifier.includes('@');
+      const email = isEmail ? identifier : `${identifier.replace(/\D/g, '')}@kinzola.app`;
+
+      const result = await supabaseLogin(email, password);
+      if (result.error) {
+        set({ error: result.error.message, loading: false });
+        return;
+      }
+
+      // Récupérer le profil complet
+      const userResult = await supabaseGetUser();
+      if (userResult.error || !userResult.profile) {
+        set({ error: 'Impossible de charger le profil', loading: false });
+        return;
+      }
+
+      const user = dbProfileToUser(userResult.profile, result.user?.email);
+
+      set({
+        isAuthenticated: true,
+        user,
+        currentScreen: 'main',
+        loading: false,
+        error: null,
+      });
+
+      // Charger toutes les données en arrière-plan
+      get().fetchAllData().catch(console.error);
+    } catch (err: any) {
+      set({ error: err?.message || 'Erreur de connexion', loading: false });
     }
-    set(updates);
   },
-  register: (data) => {
-    const newUser = { ...CURRENT_USER, ...data } as User;
+
+  register: async (data) => {
+    set({ loading: true, error: null });
+    try {
+      // Construire les données d'inscription Supabase
+      const email = data.email || `${(data.phone || '').replace(/\D/g, '')}@kinzola.app`;
+      const password = (data as any).password || 'Kinzola2024';
+
+      const result = await supabaseRegister({
+        email,
+        password,
+        pseudo: data.pseudo || data.name || '',
+        name: data.name || '',
+        age: data.age || 18,
+        gender: (data.gender as any) || 'homme',
+        city: data.city || 'Kinshasa',
+        phone: data.phone,
+        profession: data.profession,
+        religion: data.religion,
+        bio: data.bio,
+      });
+
+      if (result.error) {
+        set({ error: result.error.message, loading: false });
+        return;
+      }
+
+      // Récupérer le profil créé
+      const userResult = await supabaseGetUser();
+      if (userResult.error || !userResult.profile) {
+        set({ error: 'Impossible de charger le profil', loading: false });
+        return;
+      }
+
+      const user = dbProfileToUser(userResult.profile, email);
+
+      set({
+        isAuthenticated: true,
+        user,
+        currentScreen: 'main',
+        loading: false,
+        error: null,
+      });
+
+      // Charger toutes les données en arrière-plan
+      get().fetchAllData().catch(console.error);
+    } catch (err: any) {
+      set({ error: err?.message || "Erreur lors de l'inscription", loading: false });
+    }
+  },
+
+  logout: async () => {
+    try {
+      await supabaseLogout();
+    } catch {
+      // Même si la déconnexion Supabase échoue, on nettoie l'état local
+    }
     set({
-      user: newUser,
-      isAuthenticated: true,
-      currentScreen: 'main',
-      profiles: sortProfilesByCompatibility(newUser, MOCK_PROFILES),
+      user: null,
+      isAuthenticated: false,
+      currentScreen: 'welcome',
+      currentTab: 'discover',
+      profiles: [],
+      matches: [],
+      messages: [],
+      conversations: [],
+      posts: [],
+      stories: [],
+      notifications: [],
+      likesReceived: [],
+      profileVisitors: [],
+      blockedUserIds: [],
+      loading: false,
+      error: null,
     });
   },
-  logout: () => set({
-    user: null,
-    isAuthenticated: false,
-    currentScreen: 'welcome',
-    currentTab: 'discover',
-  }),
 
-  // Discover Actions
+  // ─── fetchAllData — charge toutes les données depuis Supabase ───────
+  fetchAllData: async () => {
+    const { user, isAuthenticated } = get();
+    if (!isAuthenticated || !user) return;
+
+    set({ loading: true });
+
+    try {
+      // Charger les données en parallèle
+      const [
+        discoverProfilesResult,
+        matchesResult,
+        conversationsResult,
+        postsResult,
+        notificationsResult,
+        blockedUsersResult,
+      ] = await Promise.allSettled([
+        getDiscoverProfiles(user.id),
+        getMatches(user.id),
+        getConversations(user.id),
+        getPosts(user.id),
+        getNotifications(user.id),
+        getBlockedUsers(user.id),
+      ]);
+
+      // Profils découverte
+      let profiles: Profile[] = [];
+      if (discoverProfilesResult.status === 'fulfilled') {
+        profiles = discoverProfilesResult.value.map(dbProfileToProfile);
+      }
+
+      // Matchs
+      let matches: Match[] = [];
+      if (matchesResult.status === 'fulfilled') {
+        matches = matchesResult.value.map((m) =>
+          dbMatchToMatch(m, m.profile)
+        );
+      }
+
+      // Conversations avec messages
+      let conversations: Conversation[] = [];
+      if (conversationsResult.status === 'fulfilled') {
+        // Charger les messages pour chaque conversation
+        const convs = conversationsResult.value;
+        conversations = await Promise.all(
+          convs.map(async (conv) => {
+            try {
+              const msgs = await getMessages(conv.id, user.id);
+              return dbConversationToConversation(conv, conv.participant, msgs);
+            } catch {
+              return dbConversationToConversation(conv, conv.participant, []);
+            }
+          })
+        );
+      }
+
+      // Posts avec likes et commentaires
+      let posts: Post[] = [];
+      if (postsResult.status === 'fulfilled') {
+        const postsData = postsResult.value;
+        posts = await Promise.all(
+          postsData.map(async (post) => {
+            try {
+              const [liked, comments] = await Promise.all([
+                checkPostLiked(post.id, user.id),
+                getComments(post.id, user.id),
+              ]);
+              const p = dbPostToPost(post);
+              p.liked = liked;
+              p.comments = comments.map(dbCommentToComment);
+              return p;
+            } catch {
+              const p = dbPostToPost(post);
+              return p;
+            }
+          })
+        );
+      }
+
+      // Notifications
+      let notifications: Notification[] = [];
+      if (notificationsResult.status === 'fulfilled') {
+        notifications = notificationsResult.value.map((n) => dbNotificationToNotification(n as any));
+      }
+
+      // Utilisateurs bloqués
+      let blockedUserIds: string[] = [];
+      if (blockedUsersResult.status === 'fulfilled') {
+        blockedUserIds = blockedUsersResult.value;
+      }
+
+      // Trier les profils par compatibilité
+      const sortedProfiles = user
+        ? sortProfilesByCompatibility(user, profiles)
+        : profiles;
+
+      set({
+        profiles: sortedProfiles,
+        matches,
+        conversations,
+        posts,
+        notifications,
+        blockedUserIds,
+        loading: false,
+        error: null,
+      });
+    } catch (err: any) {
+      console.error('[fetchAllData] Erreur:', err);
+      set({ loading: false, error: err?.message || 'Erreur de chargement des données' });
+    }
+  },
+
+  // ─── Discover Actions ───────────────────────────────────────────────
   setDiscoverMode: (mode) => set({ discoverMode: mode }),
   setDiscoverIntent: (intent) => set({ discoverIntent: intent }),
-  likeProfile: (profileId) => {
-    const { profiles, discoverIntent, user, addNotification } = get();
-    const newMatches = [...get().matches];
+
+  likeProfile: async (profileId) => {
+    const { user, profiles, discoverIntent } = get();
+    if (!user) return;
+
     const profile = profiles.find(p => p.id === profileId);
+    if (!profile) return;
 
-    // Simulate match with 40% probability
-    const isMatch = Math.random() < 0.4;
+    try {
+      const result = await supabaseLikeProfile(user.id, profile.userId);
 
-    if (isMatch && profile) {
-      newMatches.push({
-        id: `match-${Date.now()}`,
-        user1Id: 'user-me',
-        user2Id: profile.userId,
-        profile,
-        createdAt: new Date().toISOString(),
-        newMatch: true,
-      });
+      // Supprimer le profil de la liste découverte
+      const updatedProfiles = profiles.filter(p => p.id !== profileId);
+
+      if (result.matched && profile) {
+        // Créer un nouveau match local
+        const newMatch: Match = {
+          id: result.matchId || `match-${Date.now()}`,
+          user1Id: user.id,
+          user2Id: profile.userId,
+          profile,
+          createdAt: new Date().toISOString(),
+          newMatch: true,
+        };
+
+        set({
+          profiles: updatedProfiles,
+          matches: [...get().matches, newMatch],
+          showMatchModal: true,
+          matchProfile: profile,
+        });
+
+        // Recharger les conversations pour inclure la nouvelle
+        get().fetchAllData().catch(console.error);
+      } else {
+        set({ profiles: updatedProfiles });
+      }
+    } catch (err) {
+      console.error('[likeProfile] Erreur:', err);
     }
-
-    // Send notification to the "recipient" based on discoverIntent
-    if (profile) {
-      const intentLabel = discoverIntent === 'amitie' ? 'amitié' : 'amour';
-      const intentType = discoverIntent === 'amitie' ? 'friend_request' as const : 'love_interest' as const;
-      addNotification({
-        type: intentType,
-        title: discoverIntent === 'amitie' ? `Demande d'amitié de ${user?.name || 'Quelqu\'un'}` : `${user?.name || 'Quelqu\'un'} s\'intéresse à vous`,
-        message: discoverIntent === 'amitie'
-          ? `${user?.name || 'Quelqu\'un'} souhaite être votre ami(e) sur Kinzola. Connectez-vous pour répondre.`
-          : `${user?.name || 'Quelqu\'un'} a envoyé un signal d\'intérêt amoureux. Découvrez qui c'est !`,
-        fromUserId: user?.id,
-        fromUserName: user?.name,
-        fromUserPhoto: user?.photoUrl,
-      });
-    }
-
-    // Remove profile from discover list
-    const updatedProfiles = profiles.filter(p => p.id !== profileId);
-
-    set({
-      profiles: updatedProfiles,
-      matches: newMatches,
-      showMatchModal: isMatch,
-      matchProfile: isMatch ? profile : null,
-    });
   },
+
   passProfile: (profileId) => {
     const updatedProfiles = get().profiles.filter(p => p.id !== profileId);
     set({ profiles: updatedProfiles });
   },
-  useSuperLike: (profileId) => {
-    const { profiles, superLikesRemaining } = get();
-    if (superLikesRemaining <= 0) return;
 
-    const newMatches = [...get().matches];
+  useSuperLike: async (profileId) => {
+    const { user, profiles, superLikesRemaining } = get();
+    if (!user || superLikesRemaining <= 0) return;
+
     const profile = profiles.find(p => p.id === profileId);
+    if (!profile) return;
 
-    // Guaranteed match for super like
-    const isMatch = true;
+    try {
+      const result = await supabaseSuperLikeProfile(user.id, profile.userId);
 
-    if (isMatch && profile) {
-      newMatches.push({
-        id: `match-${Date.now()}`,
-        user1Id: 'user-me',
-        user2Id: profile.userId,
-        profile,
-        createdAt: new Date().toISOString(),
-        newMatch: true,
-        isSuperMatch: true,
-      });
+      // Supprimer le profil de la liste découverte
+      const updatedProfiles = profiles.filter(p => p.id !== profileId);
+
+      if (result.matched && profile) {
+        const newMatch: Match = {
+          id: result.matchId || `match-${Date.now()}`,
+          user1Id: user.id,
+          user2Id: profile.userId,
+          profile,
+          createdAt: new Date().toISOString(),
+          newMatch: true,
+          isSuperMatch: true,
+        };
+
+        set({
+          profiles: updatedProfiles,
+          matches: [...get().matches, newMatch],
+          superLikesRemaining: superLikesRemaining - 1,
+          showMatchModal: true,
+          matchProfile: profile,
+        });
+
+        // Recharger les conversations
+        get().fetchAllData().catch(console.error);
+      } else {
+        set({
+          profiles: updatedProfiles,
+          superLikesRemaining: superLikesRemaining - 1,
+        });
+      }
+    } catch (err) {
+      console.error('[useSuperLike] Erreur:', err);
     }
-
-    const updatedProfiles = profiles.filter(p => p.id !== profileId);
-
-    set({
-      profiles: updatedProfiles,
-      matches: newMatches,
-      superLikesRemaining: superLikesRemaining - 1,
-      showMatchModal: isMatch,
-      matchProfile: isMatch ? profile : null,
-    });
   },
+
   resetDailySuperLikes: () => set({ superLikesRemaining: 5 }),
   tickOnlineStatus: () => {
-    const { profiles, conversations } = get();
-    const now = new Date();
-
-    // Randomly toggle some profiles' online status
-    const updatedProfiles = profiles.map(p => {
-      if (Math.random() < 0.2) { // 20% chance to toggle each profile
-        const isNowOnline = !p.online;
-        return {
-          ...p,
-          online: isNowOnline,
-          lastSeen: isNowOnline ? p.lastSeen : now.toISOString(),
-        };
-      }
-      return p;
-    });
-
-    const updatedConversations = conversations.map(c => {
-      if (Math.random() < 0.2) {
-        const isNowOnline = !c.online;
-        return {
-          ...c,
-          online: isNowOnline,
-          lastSeen: isNowOnline ? c.lastSeen : now.toISOString(),
-        };
-      }
-      return c;
-    });
-
-    set({ profiles: updatedProfiles, conversations: updatedConversations });
+    // No-op — remplacé par realtime (Phase 5)
   },
+
   selectProfile: (profile) => set({ selectedProfile: profile, showProfileDetail: profile !== null }),
-  applyFilters: (filters) => {
+
+  applyFilters: async (filters) => {
     const { user } = get();
-    const filtered = filterAndSortProfiles(user, MOCK_PROFILES, filters);
-    set({ filters, profiles: filtered, showFilters: false });
+    set({ filters, showFilters: false });
+
+    // Recharger les profils avec les nouveaux filtres
+    if (user) {
+      try {
+        const dbProfiles = await getDiscoverProfiles(user.id, filters);
+        const profiles = dbProfiles.map(dbProfileToProfile);
+        const sorted = user ? sortProfilesByCompatibility(user, profiles) : profiles;
+        set({ profiles: sorted });
+      } catch (err) {
+        console.error('[applyFilters] Erreur:', err);
+      }
+    }
   },
-  resetFilters: () => {
+
+  resetFilters: async () => {
     const { user } = get();
-    const sorted = user
-      ? sortProfilesByCompatibility(user, MOCK_PROFILES)
-      : MOCK_PROFILES;
-    set({ filters: defaultFilters, profiles: sorted });
+    set({ filters: defaultFilters });
+
+    if (user) {
+      try {
+        const dbProfiles = await getDiscoverProfiles(user.id);
+        const profiles = dbProfiles.map(dbProfileToProfile);
+        const sorted = user ? sortProfilesByCompatibility(user, profiles) : profiles;
+        set({ profiles: sorted });
+      } catch (err) {
+        console.error('[resetFilters] Erreur:', err);
+      }
+    }
   },
+
   setShowFilters: (show) => set({ showFilters: show }),
 
-  // Messages Actions
+  // ─── Messages Actions ───────────────────────────────────────────────
   openChat: (conversationId) => set({ currentChatId: conversationId }),
   closeChat: () => set({ currentChatId: null }),
-  sendMessage: (conversationId, content) => {
-    const { conversations } = get();
-    const updatedConversations = conversations.map(conv => {
-      if (conv.id === conversationId) {
+
+  sendMessage: async (conversationId, content) => {
+    const { user, conversations } = get();
+    if (!user) return;
+
+    try {
+      await supabaseSendMessage(conversationId, user.id, content, 'text');
+
+      // Mettre à jour la conversation locale
+      const conv = conversations.find(c => c.id === conversationId);
+      if (conv) {
         const newMessage: Message = {
-          id: `msg-${Date.now()}`,
-          senderId: 'user-me',
+          id: `msg-local-${Date.now()}`,
+          senderId: user.id,
           receiverId: conv.participant.userId,
           content,
           type: 'text',
           read: false,
           timestamp: new Date().toISOString(),
         };
-        return {
-          ...conv,
-          messages: [...conv.messages, newMessage],
-          lastMessage: content,
-          lastMessageTime: 'Maintenant',
-        };
+        const updatedConversations = conversations.map(c => {
+          if (c.id === conversationId) {
+            return {
+              ...c,
+              messages: [...c.messages, newMessage],
+              lastMessage: content,
+              lastMessageTime: 'Maintenant',
+            };
+          }
+          return c;
+        });
+        set({ conversations: updatedConversations });
       }
-      return conv;
-    });
-    set({ conversations: updatedConversations });
+    } catch (err) {
+      console.error('[sendMessage] Erreur:', err);
+    }
   },
-  sendMessageWithType: (conversationId, content, type) => {
-    const { conversations } = get();
-    const updatedConversations = conversations.map(conv => {
-      if (conv.id === conversationId) {
+
+  sendMessageWithType: async (conversationId, content, type) => {
+    const { user, conversations } = get();
+    if (!user) return;
+
+    try {
+      await supabaseSendMessage(conversationId, user.id, content, type as any);
+
+      const conv = conversations.find(c => c.id === conversationId);
+      if (conv) {
         const newMessage: Message = {
-          id: `msg-${Date.now()}`,
-          senderId: 'user-me',
+          id: `msg-local-${Date.now()}`,
+          senderId: user.id,
           receiverId: conv.participant.userId,
           content,
           type: type as Message['type'],
           read: false,
           timestamp: new Date().toISOString(),
         };
-        return {
-          ...conv,
-          messages: [...conv.messages, newMessage],
-          lastMessage: type === 'voice' ? '🎤 Message vocal' : type === 'image' ? '📷 Photo' : type === 'video' ? '🎬 Vidéo' : content,
-          lastMessageTime: 'Maintenant',
-        };
+        const updatedConversations = conversations.map(c => {
+          if (c.id === conversationId) {
+            return {
+              ...c,
+              messages: [...c.messages, newMessage],
+              lastMessage: type === 'voice' ? '🎤 Message vocal' : type === 'image' ? '📷 Photo' : type === 'video' ? '🎬 Vidéo' : content,
+              lastMessageTime: 'Maintenant',
+            };
+          }
+          return c;
+        });
+        set({ conversations: updatedConversations });
       }
-      return conv;
-    });
-    set({ conversations: updatedConversations });
+    } catch (err) {
+      console.error('[sendMessageWithType] Erreur:', err);
+    }
   },
-  deleteMessageForMe: (conversationId, messageId) => {
-    const updatedConversations = get().conversations.map(conv => {
-      if (conv.id === conversationId) {
-        return {
-          ...conv,
-          messages: conv.messages.map(m =>
-            m.id === messageId ? { ...m, deletedForMe: true } : m
-          ),
-        };
-      }
-      return conv;
-    });
-    set({ conversations: updatedConversations });
-  },
-  deleteMessageForAll: (conversationId, messageId) => {
-    const updatedConversations = get().conversations.map(conv => {
-      if (conv.id === conversationId) {
-        return {
-          ...conv,
-          messages: conv.messages.map(m =>
-            m.id === messageId ? { ...m, deletedForAll: true, content: 'Ce message a été supprimé', type: 'text' as const } : m
-          ),
-          lastMessage: conv.messages.find(m => m.id === messageId)
-            ? 'Ce message a été supprimé'
-            : conv.lastMessage,
-        };
-      }
-      return conv;
-    });
-    set({ conversations: updatedConversations });
-  },
-  toggleMessageImportant: (conversationId, messageId) => {
-    const updatedConversations = get().conversations.map(conv => {
-      if (conv.id === conversationId) {
-        return {
-          ...conv,
-          messages: conv.messages.map(m =>
-            m.id === messageId ? { ...m, important: !m.important } : m
-          ),
-        };
-      }
-      return conv;
-    });
-    set({ conversations: updatedConversations });
-  },
-  sendReplyMessage: (conversationId, content, replyTo) => {
-    const { conversations } = get();
-    const updatedConversations = conversations.map(conv => {
-      if (conv.id === conversationId) {
+
+  sendReplyMessage: async (conversationId, content, replyTo) => {
+    const { user, conversations } = get();
+    if (!user) return;
+
+    try {
+      await supabaseSendReplyMessage(conversationId, user.id, content, replyTo.messageId);
+
+      const conv = conversations.find(c => c.id === conversationId);
+      if (conv) {
         const newMessage: Message = {
-          id: `msg-${Date.now()}`,
-          senderId: 'user-me',
+          id: `msg-local-${Date.now()}`,
+          senderId: user.id,
           receiverId: conv.participant.userId,
           content,
           type: 'text',
@@ -612,24 +869,115 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
           timestamp: new Date().toISOString(),
           replyTo,
         };
-        return {
-          ...conv,
-          messages: [...conv.messages, newMessage],
-          lastMessage: content,
-          lastMessageTime: 'Maintenant',
-        };
+        const updatedConversations = conversations.map(c => {
+          if (c.id === conversationId) {
+            return {
+              ...c,
+              messages: [...c.messages, newMessage],
+              lastMessage: content,
+              lastMessageTime: 'Maintenant',
+            };
+          }
+          return c;
+        });
+        set({ conversations: updatedConversations });
       }
-      return conv;
-    });
-    set({ conversations: updatedConversations });
+    } catch (err) {
+      console.error('[sendReplyMessage] Erreur:', err);
+    }
   },
-  forwardMessageToConversation: (targetConversationId, content) => {
+
+  deleteMessageForMe: async (conversationId, messageId) => {
+    const { user } = get();
+    if (!user) return;
+
+    try {
+      await supabaseDeleteMessageForMe(messageId, user.id);
+
+      const updatedConversations = get().conversations.map(conv => {
+        if (conv.id === conversationId) {
+          return {
+            ...conv,
+            messages: conv.messages.map(m =>
+              m.id === messageId ? { ...m, deletedForMe: true } : m
+            ),
+          };
+        }
+        return conv;
+      });
+      set({ conversations: updatedConversations });
+    } catch (err) {
+      console.error('[deleteMessageForMe] Erreur:', err);
+    }
+  },
+
+  deleteMessageForAll: async (conversationId, messageId) => {
+    const { user } = get();
+    if (!user) return;
+
+    try {
+      // Supprimer pour soi-même (des deux côtés non gérés côté client)
+      await supabaseDeleteMessageForMe(messageId, user.id);
+
+      const updatedConversations = get().conversations.map(conv => {
+        if (conv.id === conversationId) {
+          return {
+            ...conv,
+            messages: conv.messages.map(m =>
+              m.id === messageId ? { ...m, deletedForMe: true } : m
+            ),
+          };
+        }
+        return conv;
+      });
+      set({ conversations: updatedConversations });
+    } catch (err) {
+      console.error('[deleteMessageForAll] Erreur:', err);
+    }
+  },
+
+  toggleMessageImportant: async (conversationId, messageId) => {
     const { conversations } = get();
+
+    try {
+      const msg = conversations
+        .find(c => c.id === conversationId)
+        ?.messages.find(m => m.id === messageId);
+
+      if (!msg) return;
+
+      await supabaseToggleMessageImportant(messageId, !msg.important);
+
+      const updatedConversations = conversations.map(conv => {
+        if (conv.id === conversationId) {
+          return {
+            ...conv,
+            messages: conv.messages.map(m =>
+              m.id === messageId ? { ...m, important: !m.important } : m
+            ),
+          };
+        }
+        return conv;
+      });
+      set({ conversations: updatedConversations });
+    } catch (err) {
+      console.error('[toggleMessageImportant] Erreur:', err);
+    }
+  },
+
+  forwardMessageToConversation: (targetConversationId, content) => {
+    const { user, conversations } = get();
+    if (!user) return;
+
+    // Envoyer via sendMessage en arrière-plan
+    supabaseSendMessage(targetConversationId, user.id, `▶ ${content}`, 'text')
+      .catch(console.error);
+
     const updatedConversations = conversations.map(conv => {
       if (conv.id === targetConversationId) {
         const newMessage: Message = {
           id: `msg-${Date.now()}`,
-          senderId: 'user-me',
+          senderId: user.id,
           receiverId: conv.participant.userId,
           content: `▶ ${content}`,
           type: 'text',
@@ -647,282 +995,45 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
     });
     set({ conversations: updatedConversations });
   },
-  deleteConversation: (conversationId) => {
-    const updatedConversations = get().conversations.filter(c => c.id !== conversationId);
-    set({ conversations: updatedConversations, currentChatId: null });
-  },
 
-  // Simulate incoming reply from the other person (mock auto-reply)
-  simulateReply: (conversationId: string, sentContent: string) => {
-    const { conversations, user, blockedUserIds } = get();
-    const conv = conversations.find(c => c.id === conversationId);
-    if (!conv || blockedUserIds.includes(conv.participant.userId)) return;
-
-    // Generate a contextual reply based on what was sent
-    const replies = [
-      'Haha c\'est vrai 😂',
-      'Oh j\'adore ça !',
-      'Tu es très intéressant(e) 🥰',
-      'On se voit quand ?',
-      'Moi aussi je pense la même chose',
-      'Trop bien ! Dis m\'en plus',
-      'Je suis d\'accord avec toi 💯',
-      'C\'est beau ce que tu dis ❤️',
-      'Ah oui ? Et après ?',
-      'Je n\'ai pas encore vu ça, raconte moi',
-      'Tu me fais rire 😄',
-      'C\'est gentil de ta part',
-      'On a beaucoup en commun je trouve',
-      'Je kiffe ta vibe 🙌',
-      'C\'est cool, on devrait en parler plus',
-    ];
-
-    // Pick a reply (try to be contextually relevant sometimes)
-    let replyContent: string;
-    const lower = sentContent.toLowerCase();
-    if (lower.includes('bonjour') || lower.includes('salut') || lower.includes('hey') || lower.includes('yo')) {
-      replyContent = 'Salut ! Comment tu vas ? 😊';
-    } else if (lower.includes('ça va') || lower.includes('comment') || lower.includes('how')) {
-      replyContent = 'Je vais bien merci ! Et toi ?';
-    } else if (lower.includes('nom') || lower.includes('appell')) {
-      replyContent = `Moi c'est ${conv.participant.name}, enchanté(e) ! 😊`;
-    } else if (lower.includes('match') || lower.includes('plais')) {
-      replyContent = 'Oui je suis content(e) de ce match ! Tu me plais beaucoup ❤️';
-    } else if (lower.includes('photo') || lower.includes('voir') || lower.includes('rencontr')) {
-      replyContent = 'Oui avec plaisir ! On peut se voir un de ces jours 🥰';
-    } else {
-      replyContent = replies[Math.floor(Math.random() * replies.length)];
+  deleteConversation: async (conversationId) => {
+    try {
+      await supabaseDeleteConversation(conversationId);
+      const updatedConversations = get().conversations.filter(c => c.id !== conversationId);
+      set({ conversations: updatedConversations, currentChatId: null });
+    } catch (err) {
+      console.error('[deleteConversation] Erreur:', err);
     }
-
-    // Delay 2-5 seconds before "replying"
-    const delay = 2000 + Math.random() * 3000;
-    setTimeout(() => {
-      const currentConvs = get().conversations;
-      const updatedConvs = currentConvs.map(c => {
-        if (c.id !== conversationId) return c;
-        const replyMsg: Message = {
-          id: `msg-${Date.now()}`,
-          senderId: c.participant.userId,
-          receiverId: 'user-me',
-          content: replyContent,
-          type: 'text',
-          read: false,
-          timestamp: new Date().toISOString(),
-        };
-        return {
-          ...c,
-          messages: [...c.messages, replyMsg],
-          lastMessage: replyContent,
-          lastMessageTime: 'Maintenant',
-          unreadCount: (c.unreadCount || 0) + 1,
-        };
-      });
-      set({ conversations: updatedConvs });
-
-      // Also add a notification for the incoming message
-      get().addNotification({
-        type: 'message',
-        title: `${conv.participant.name} vous a envoyé un message`,
-        message: replyContent,
-        fromUserId: conv.participant.userId,
-        fromUserName: conv.participant.name,
-        fromUserPhoto: conv.participant.photoUrl,
-      });
-
-      // Rich browser notification via Service Worker for incoming message
-      try {
-        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-          const notifTitle = `💬 ${conv.participant.name}`;
-          const showFallback = () => {
-            const n = new Notification(notifTitle, { body: replyContent, icon: '/favicon.ico', silent: true, vibrate: [200, 100, 200] });
-            setTimeout(() => { n.close(); }, 8000);
-          };
-          if ('serviceWorker' in navigator && navigator.serviceWorker) {
-            // Race: if SW not ready within 3s, fallback to basic Notification
-            const timeout = setTimeout(showFallback, 3000);
-            navigator.serviceWorker.ready.then((reg) => {
-              clearTimeout(timeout);
-              try {
-                reg.showNotification(notifTitle, {
-                  body: replyContent,
-                  icon: '/favicon.ico',
-                  badge: '/favicon.ico',
-                  tag: `kinzola-msg-${conversationId}-${Date.now()}`,
-                  renotify: true,
-                  requireInteraction: true,
-                  silent: true,
-                  vibrate: [200, 100, 200],
-                  data: { conversationId, participantName: conv.participant.name },
-                  actions: [
-                    { action: 'reply', title: 'Répondre' },
-                    { action: 'mark-read', title: 'Marqué comme lu' },
-                    { action: 'silence', title: 'Silence' },
-                  ],
-                });
-              } catch { showFallback(); }
-            }).catch(() => { clearTimeout(timeout); showFallback(); });
-          } else {
-            showFallback();
-          }
-        }
-      } catch {}
-
-      // Play notification sound
-      try {
-        if (typeof window !== 'undefined') {
-          const audio = new Audio('/sounds/notification-message.wav');
-          audio.volume = 0.6;
-          audio.play().catch(() => {});
-        }
-      } catch {}
-    }, delay);
   },
 
-  // Random incoming messages (simulate realistic activity)
-  startRandomMessages: () => {
-    if (typeof window === 'undefined') return;
-    const { conversations, blockedUserIds } = get();
-    const availableConvs = conversations.filter(c => !blockedUserIds.includes(c.participant.userId));
-    if (availableConvs.length === 0) return;
+  // No-op — remplacé par realtime (Phase 5)
+  simulateReply: (_conversationId: string, _sentContent: string) => {},
 
-    // Random delay between 15-60 seconds
-    const scheduleNext = () => {
-      const delay = 15000 + Math.random() * 45000;
-      const timerId = setTimeout(() => {
-        const currentConvs = get().conversations;
-        const avail = currentConvs.filter(c => !get().blockedUserIds.includes(c.participant.userId));
-        if (avail.length === 0) return;
+  // No-op — remplacé par realtime (Phase 5)
+  startRandomMessages: () => {},
 
-        const randomConv = avail[Math.floor(Math.random() * avail.length)];
-        const randomMessages = [
-          'Hey ! Tu es là ? 😊',
-          'Je pensais à toi...',
-          'Comment se passe ta journée ?',
-          'T\'as vu le match hier ? ⚽',
-          'On devrait se retrouver un de ces jours',
-          'Tu connais un bon endroit à Kin ?',
-          'J\'aime bien ta photo de profil ❤️',
-          'Bonne nuit ! 🌙',
-          'Tu fais quoi ce weekend ?',
-          'C\'est sympa de discuter avec toi',
-          'Je viens de rentrer chez moi',
-          'Tu es sur Kinshasa aussi ?',
-        ];
-        const content = randomMessages[Math.floor(Math.random() * randomMessages.length)];
-
-        const updatedConvs = currentConvs.map(c => {
-          if (c.id !== randomConv.id) return c;
-          const replyMsg: Message = {
-            id: `msg-${Date.now()}`,
-            senderId: c.participant.userId,
-            receiverId: 'user-me',
-            content,
-            type: 'text',
-            read: false,
-            timestamp: new Date().toISOString(),
-          };
-          return {
-            ...c,
-            messages: [...c.messages, replyMsg],
-            lastMessage: content,
-            lastMessageTime: 'Maintenant',
-            unreadCount: (c.unreadCount || 0) + 1,
-          };
-        });
-        set({ conversations: updatedConvs });
-
-        // Add notification
-        get().addNotification({
-          type: 'message',
-          title: `${randomConv.participant.name} vous a envoyé un message`,
-          message: content,
-          fromUserId: randomConv.participant.userId,
-          fromUserName: randomConv.participant.name,
-          fromUserPhoto: randomConv.participant.photoUrl,
-        });
-
-        // Play sound
-        try {
-          const audio = new Audio('/sounds/notification-message.wav');
-          audio.volume = 0.6;
-          audio.play().catch(() => {});
-        } catch {}
-
-        // Rich browser notification via Service Worker for random incoming message
-        try {
-          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-            const notifTitle = `💬 ${randomConv.participant.name}`;
-            const showFallback = () => {
-              const n = new Notification(notifTitle, { body: content, icon: '/favicon.ico', silent: true, vibrate: [200, 100, 200] });
-              setTimeout(() => { n.close(); }, 8000);
-            };
-            if ('serviceWorker' in navigator && navigator.serviceWorker) {
-              const timeout = setTimeout(showFallback, 3000);
-              navigator.serviceWorker.ready.then((reg) => {
-                clearTimeout(timeout);
-                try {
-                  reg.showNotification(notifTitle, {
-                    body: content,
-                    icon: '/favicon.ico',
-                    badge: '/favicon.ico',
-                    tag: `kinzola-msg-${randomConv.id}-${Date.now()}`,
-                    renotify: true,
-                    requireInteraction: true,
-                    silent: true,
-                    vibrate: [200, 100, 200],
-                    data: { conversationId: randomConv.id, participantName: randomConv.participant.name },
-                    actions: [
-                      { action: 'reply', title: 'Répondre' },
-                      { action: 'mark-read', title: 'Marqué comme lu' },
-                      { action: 'silence', title: 'Silence' },
-                    ],
-                  });
-                } catch { showFallback(); }
-              }).catch(() => { clearTimeout(timeout); showFallback(); });
-            } else {
-              showFallback();
-            }
-          }
-        } catch {}
-
-        // Schedule next random message
-        scheduleNext();
-      }, delay);
-
-      // Store timer ID for cleanup
-      (get() as any)._randomMsgTimer = timerId;
-    };
-
-    scheduleNext();
-  },
-
-  // Posts Actions
-  createPost: (content, imageUrl, visibility = 'public') => {
+  // ─── Posts Actions ──────────────────────────────────────────────────
+  createPost: async (content, imageUrl, visibility = 'public') => {
     const { user, posts } = get();
     if (!user) return;
-    const postVisibility = visibility;
-    const newPost: Post = {
-      id: `post-${Date.now()}`,
-      authorId: user.id,
-      authorName: user.name,
-      authorPhoto: user.photoUrl,
-      content,
-      imageUrl,
-      views: 0,
-      likes: 0,
-      liked: false,
-      comments: [],
-      createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
-      type: imageUrl ? 'photo' : 'text',
-      visibility: postVisibility,
-    };
-    set({ posts: [newPost, ...posts] });
+
+    try {
+      const dbPost = await supabaseCreatePost(user.id, content, imageUrl, visibility);
+      const newPost = dbPostToPost(dbPost);
+      newPost.liked = false;
+      newPost.authorName = user.name;
+      newPost.authorPhoto = user.photoUrl;
+      set({ posts: [newPost, ...posts] });
+    } catch (err) {
+      console.error('[createPost] Erreur:', err);
+    }
   },
+
   createStory: (content, imageUrl) => {
     const { user, stories } = get();
     if (!user) return;
-    const newStory: import('@/types').Story = {
+    // Les stories seront gérées par Supabase dans une phase future
+    const newStory: Story = {
       id: `story-${Date.now()}`,
       authorId: user.id,
       authorName: user.name,
@@ -938,46 +1049,56 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
     };
     set({ stories: [newStory, ...stories] });
   },
-  likePost: (postId) => {
-    const { posts } = get();
-    const updatedPosts = posts.map(post => {
-      if (post.id === postId) {
-        return {
-          ...post,
-          liked: !post.liked,
-          likes: post.liked ? post.likes - 1 : post.likes + 1,
-        };
-      }
-      return post;
-    });
-    set({ posts: updatedPosts });
-  },
-  addComment: (postId, content, isPublic) => {
-    const { user, posts, notifications } = get();
+
+  likePost: async (postId) => {
+    const { user, posts } = get();
     if (!user) return;
-    const newComment = {
-      id: `comment-${Date.now()}`,
-      authorId: user.id,
-      authorName: user.name,
-      authorPhoto: user.photoUrl,
-      content,
-      createdAt: new Date().toISOString(),
-      isPublic,
-    };
-    const updatedPosts = posts.map(post => {
-      if (post.id === postId) {
-        return {
-          ...post,
-          comments: [...post.comments, newComment],
-        };
-      }
-      return post;
-    });
-    set({ posts: updatedPosts, commentingPostId: null });
+
+    try {
+      const result = await supabaseLikePost(postId, user.id);
+
+      const updatedPosts = posts.map(post => {
+        if (post.id === postId) {
+          return {
+            ...post,
+            liked: result.liked,
+            likes: result.totalLikes,
+          };
+        }
+        return post;
+      });
+      set({ posts: updatedPosts });
+    } catch (err) {
+      console.error('[likePost] Erreur:', err);
+    }
   },
+
+  addComment: async (postId, content, isPublic) => {
+    const { user, posts } = get();
+    if (!user) return;
+
+    try {
+      const dbComment = await supabaseAddComment(postId, user.id, content, isPublic);
+      const newComment = dbCommentToComment(dbComment);
+
+      const updatedPosts = posts.map(post => {
+        if (post.id === postId) {
+          return {
+            ...post,
+            comments: [...post.comments, newComment],
+          };
+        }
+        return post;
+      });
+      set({ posts: updatedPosts, commentingPostId: null });
+    } catch (err) {
+      console.error('[addComment] Erreur:', err);
+    }
+  },
+
   setCommentingPostId: (postId) => set({ commentingPostId: postId }),
 
-  // Text Size Actions
+  // ─── Text Size Actions ──────────────────────────────────────────────
   setTextSize: (size) => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('kinzola-text-size', String(size));
@@ -985,7 +1106,7 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
     set({ textSize: size });
   },
 
-  // Hydrate Actions — charge les préférences depuis localStorage côté client uniquement
+  // ─── Hydrate Actions ────────────────────────────────────────────────
   hydrate: () => {
     if (typeof window === 'undefined') return;
     const savedSize = parseInt(localStorage.getItem('kinzola-text-size') || '16', 10);
@@ -1009,42 +1130,20 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
     }
   },
 
-  // Password Actions
-  changePassword: (userId, oldPassword, newPassword) => {
-    const { userPasswords } = get();
-    const currentPwd = userPasswords[userId];
-
-    // Check old password
-    if (oldPassword !== currentPwd) {
-      return { success: false, error: 'Ancien mot de passe incorrect' };
+  // ─── Password Actions ───────────────────────────────────────────────
+  changePassword: async (userId, oldPassword, newPassword) => {
+    try {
+      const result = await supabaseChangePassword(userId, oldPassword, newPassword);
+      if (result.error) {
+        return { success: false, error: result.error.message };
+      }
+      return { success: true, error: '' };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Erreur lors du changement de mot de passe' };
     }
-
-    // Check minimum length
-    if (newPassword.length < 8) {
-      return { success: false, error: 'Le mot de passe doit contenir au moins 8 caractères' };
-    }
-
-    // Check contains at least one digit
-    if (!/[0-9]/.test(newPassword)) {
-      return { success: false, error: 'Le mot de passe doit contenir au moins un chiffre' };
-    }
-
-    // Check contains at least one letter
-    if (!/[a-zA-Z]/.test(newPassword)) {
-      return { success: false, error: 'Le mot de passe doit contenir au moins une lettre' };
-    }
-
-    // Check not same as old
-    if (newPassword === currentPwd) {
-      return { success: false, error: 'Le nouveau mot de passe doit être différent de l\'ancien' };
-    }
-
-    // Update password
-    set({ userPasswords: { ...userPasswords, [userId]: newPassword } });
-    return { success: true, error: '' };
   },
 
-  // Notification Actions
+  // ─── Notification Actions ───────────────────────────────────────────
   addNotification: (notification) => {
     const newNotification: Notification = {
       ...notification,
@@ -1054,40 +1153,69 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
     };
     set({ notifications: [newNotification, ...get().notifications] });
   },
-  markAllNotificationsRead: () => {
-    const updatedNotifications = get().notifications.map(n => ({ ...n, read: true }));
-    set({ notifications: updatedNotifications });
+
+  markAllNotificationsRead: async () => {
+    const { user } = get();
+    if (!user) return;
+
+    try {
+      await supabaseMarkAllNotificationsRead(user.id);
+      const updatedNotifications = get().notifications.map(n => ({ ...n, read: true }));
+      set({ notifications: updatedNotifications });
+    } catch (err) {
+      console.error('[markAllNotificationsRead] Erreur:', err);
+    }
   },
-  markNotificationRead: (notifId) => {
-    const updatedNotifications = get().notifications.map(n => {
-      if (n.id === notifId) return { ...n, read: true };
-      return n;
-    });
-    set({ notifications: updatedNotifications });
+
+  markNotificationRead: async (notifId) => {
+    try {
+      await supabaseMarkNotificationRead(notifId);
+      const updatedNotifications = get().notifications.map(n => {
+        if (n.id === notifId) return { ...n, read: true };
+        return n;
+      });
+      set({ notifications: updatedNotifications });
+    } catch (err) {
+      console.error('[markNotificationRead] Erreur:', err);
+    }
   },
-  deleteNotification: (notifId) => {
-    set({ notifications: get().notifications.filter(n => n.id !== notifId) });
+
+  deleteNotification: async (notifId) => {
+    try {
+      await supabaseDeleteNotification(notifId);
+      set({ notifications: get().notifications.filter(n => n.id !== notifId) });
+    } catch (err) {
+      console.error('[deleteNotification] Erreur:', err);
+    }
   },
-  clearAllNotifications: () => {
-    set({ notifications: [] });
+
+  clearAllNotifications: async () => {
+    const { user } = get();
+    if (!user) return;
+
+    try {
+      await supabaseClearAllNotifications(user.id);
+      set({ notifications: [] });
+    } catch (err) {
+      console.error('[clearAllNotifications] Erreur:', err);
+    }
   },
+
   setShowNotifications: (show) => {
     if (show) {
-      // Mark all as read when opening
+      // Marquer toutes comme lues à l'ouverture
       get().markAllNotificationsRead();
     }
     set({ showNotifications: show });
   },
 
-  // Badge Actions
+  // ─── Badge Actions ──────────────────────────────────────────────────
   setBadgeStatus: (status) => {
     const updates: Partial<KinzolaState> = { badgeStatus: status };
     if (status === 'processing') {
       updates.badgeRequestTime = new Date().toISOString();
-      // Auto-approve after 1 hour (simulated: check on init)
     }
     if (status === 'approved') {
-      // Update user verified status
       const { user } = get();
       if (user) {
         updates.user = { ...user, verified: true };
@@ -1096,7 +1224,7 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
     set(updates);
   },
 
-  // Theme Actions
+  // ─── Theme Actions ──────────────────────────────────────────────────
   setTheme: (theme) => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('kinzola-theme', theme);
@@ -1104,7 +1232,7 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
     set({ theme });
   },
 
-  // UI Actions
+  // ─── UI Actions ─────────────────────────────────────────────────────
   setShowMatchModal: (show, profile) => set({ showMatchModal: show, matchProfile: profile || null }),
   setShowNewPost: (show) => set({ showNewPost: show }),
   setShowProfileDetail: (show) => set({ showProfileDetail: show }),
@@ -1112,15 +1240,30 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
   setShowSettings: (show) => set({ showSettings: show }),
   setShowEditPersonalInfo: (show) => set({ showEditPersonalInfo: show }),
   setRegisterStep: (step) => set({ registerStep: step }),
-  updateProfile: (data) => {
+
+  updateProfile: async (data) => {
     const { user } = get();
-    if (user) {
-      set({ user: { ...user, ...data } });
+    if (!user) return;
+
+    try {
+      const dbUpdate = userProfileToDbUpdate(data);
+      const { profile: updated, error } = await supabaseUpdateProfile(user.id, dbUpdate as any);
+      if (error) {
+        console.error('[updateProfile] Erreur:', error);
+        return;
+      }
+      if (updated) {
+        const updatedUser = dbProfileToUser(updated, user.email);
+        set({ user: updatedUser });
+      }
+    } catch (err) {
+      console.error('[updateProfile] Erreur:', err);
     }
   },
 
-  // Chat Contact Detail Actions
+  // ─── Chat Contact Detail Actions ────────────────────────────────────
   setShowChatContactDetail: (show) => set({ showChatContactDetail: show }),
+
   setCustomNickname: (conversationId, nickname) => {
     const { customNicknames } = get();
     const updated = { ...customNicknames };
@@ -1134,43 +1277,81 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
     }
     set({ customNicknames: updated });
   },
-  blockUser: (userId) => {
-    const { blockedUserIds } = get();
-    if (!blockedUserIds.includes(userId)) {
-      set({ blockedUserIds: [...blockedUserIds, userId] });
+
+  blockUser: async (userId) => {
+    const { user, blockedUserIds } = get();
+    if (!user) return;
+
+    try {
+      await supabaseBlockUser(user.id, userId);
+      if (!blockedUserIds.includes(userId)) {
+        set({ blockedUserIds: [...blockedUserIds, userId] });
+      }
+    } catch (err) {
+      console.error('[blockUser] Erreur:', err);
     }
   },
-  unblockUser: (userId) => {
-    const { blockedUserIds } = get();
-    set({ blockedUserIds: blockedUserIds.filter(id => id !== userId) });
+
+  unblockUser: async (userId) => {
+    const { user, blockedUserIds } = get();
+    if (!user) return;
+
+    try {
+      await supabaseUnblockUser(user.id, userId);
+      set({ blockedUserIds: blockedUserIds.filter(id => id !== userId) });
+    } catch (err) {
+      console.error('[unblockUser] Erreur:', err);
+    }
   },
+
   muteConversation: (conversationId) => {
     const { mutedConversationIds } = get();
     if (!mutedConversationIds.includes(conversationId)) {
       set({ mutedConversationIds: [...mutedConversationIds, conversationId] });
     }
   },
+
   unmuteConversation: (conversationId) => {
     const { mutedConversationIds } = get();
     set({ mutedConversationIds: mutedConversationIds.filter(id => id !== conversationId) });
   },
-  markConversationRead: (conversationId) => {
-    const updatedConvs = get().conversations.map(c =>
-      c.id === conversationId ? { ...c, unreadCount: 0 } : c
-    );
-    set({ conversations: updatedConvs });
+
+  markConversationRead: async (conversationId) => {
+    const { user } = get();
+    if (!user) return;
+
+    try {
+      await markMessagesAsRead(conversationId, user.id);
+      const updatedConvs = get().conversations.map(c =>
+        c.id === conversationId ? { ...c, unreadCount: 0 } : c
+      );
+      set({ conversations: updatedConvs });
+    } catch (err) {
+      console.error('[markConversationRead] Erreur:', err);
+    }
   },
-  setPendingNotificationReply: (data) => {
-    set({ pendingNotificationReply: data });
-  },
-  reportUser: (targetUserId, reason) => {
-    const { reports } = get();
-    const newReport = {
-      id: `report-${Date.now()}`,
-      targetUserId,
-      reason,
-      createdAt: new Date().toISOString(),
-    };
-    set({ reports: [newReport, ...reports] });
+
+  setPendingNotificationReply: (data) => set({ pendingNotificationReply: data }),
+
+  reportUser: async (targetUserId, reason) => {
+    const { user, reports } = get();
+    if (!user) return;
+
+    try {
+      await supabaseReportUser(user.id, targetUserId, reason as any);
+      set({
+        reports: [
+          ...reports,
+          {
+            id: `report-${Date.now()}`,
+            targetUserId,
+            reason,
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      });
+    } catch (err) {
+      console.error('[reportUser] Erreur:', err);
+    }
   },
 }));

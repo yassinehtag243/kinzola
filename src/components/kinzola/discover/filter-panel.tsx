@@ -4,10 +4,10 @@ import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { X, RotateCcw, Search, Plus, Check } from 'lucide-react';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
-import { AVAILABLE_CITIES, AVAILABLE_RELIGIONS, AVAILABLE_INTERESTS, MOCK_PROFILES } from '@/lib/mock-data';
+import { AVAILABLE_CITIES, AVAILABLE_RELIGIONS, AVAILABLE_INTERESTS } from '@/lib/constants';
 
 export default function FilterPanel() {
-  const { filters, applyFilters, resetFilters, setShowFilters } = useKinzolaStore();
+  const { filters, applyFilters, resetFilters, setShowFilters, profiles } = useKinzolaStore();
   const [localFilters, setLocalFilters] = useState(filters);
   const [selectedCities, setSelectedCities] = useState<string[]>(filters.cities);
   const [selectedReligions, setSelectedReligions] = useState<string[]>(filters.religions);
@@ -20,14 +20,14 @@ export default function FilterPanel() {
 
   // Preview how many profiles will match
   const previewCount = useMemo(() => {
-    let count = [...MOCK_PROFILES];
+    let count = [...profiles];
     if (localFilters.gender !== 'tous') count = count.filter(p => p.gender === localFilters.gender);
     if (localFilters.ageMin > 18) count = count.filter(p => p.age >= localFilters.ageMin);
     if (localFilters.ageMax < 99) count = count.filter(p => p.age <= localFilters.ageMax);
     if (selectedCities.length > 0) count = count.filter(p => selectedCities.includes(p.city));
     if (selectedReligions.length > 0) count = count.filter(p => selectedReligions.includes(p.religion));
     return count.length;
-  }, [localFilters, selectedCities, selectedReligions, selectedInterests]);
+  }, [localFilters, selectedCities, selectedReligions, selectedInterests, profiles]);
 
   const toggleCity = (city: string) => {
     setSelectedCities(prev =>

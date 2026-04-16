@@ -45,6 +45,17 @@ export {
   addComment, getComments, deletePost, getUserPosts, incrementPostViews,
 } from './posts-service';
 
+// Notifications
+export {
+  getNotifications, markNotificationRead, markAllNotificationsRead,
+  deleteNotification, clearAllNotifications, subscribeToNotifications,
+} from './notifications-service';
+
+// Discover
+export {
+  getDiscoverProfiles,
+} from './discover-service';
+
 // Storage
 export {
   uploadProfilePhoto, uploadGalleryPhoto, uploadMessageImage,
