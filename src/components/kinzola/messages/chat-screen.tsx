@@ -749,7 +749,7 @@ export default function ChatScreen() {
   const messages = conversation?.messages ?? [];
   const participant = conversation?.participant ?? null;
   const online = participant?.online ?? false;
-  const displayName = customNicknames[conversationId] || participant.name;
+  const displayName = customNicknames[conversationId] || participant?.name || 'Inconnu';
   const lastMsgId = messages.length > 0 ? messages[messages.length - 1].id : '';
   const isUserBlocked = participant ? blockedUserIds.includes(participant.userId) : false;
 

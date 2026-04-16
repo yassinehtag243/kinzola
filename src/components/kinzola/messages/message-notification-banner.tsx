@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { X, BellOff, MessageCircle, CheckCheck, ChevronUp } from 'lucide-react';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
 
@@ -17,11 +17,12 @@ interface IncomingMessage {
 /**
  * MessageNotificationBanner
  * WhatsApp-style notification that slides from top when a new message arrives.
- * Shows: avatar, name, message preview, time + action buttons (Répondre, Marquer comme lu, Silence)
+ * Swipe left or right to dismiss. Auto-dismisses after 6 seconds.
  */
 export default function MessageNotificationBanner() {
   const [activeNotification, setActiveNotification] = useState<IncomingMessage | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [exitDirection, setExitDirection] = useState<number>(0); // -1 = left, 1 = right, 0 = up
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevNotifCount = useRef(0);
 
@@ -71,10 +72,12 @@ export default function MessageNotificationBanner() {
 
     setActiveNotification(notif);
     setExpanded(false);
+    setExitDirection(0);
 
-    // Auto dismiss after 6 seconds
+    // Auto dismiss after 6 seconds (slides back up)
     if (dismissTimer.current) clearTimeout(dismissTimer.current);
     dismissTimer.current = setTimeout(() => {
+      setExitDirection(0); // default: slide up
       setActiveNotification(null);
     }, 6000);
 
@@ -83,8 +86,9 @@ export default function MessageNotificationBanner() {
     };
   }, [notifications.length, conversations, mutedConversationIds, currentChatId]);
 
-  const handleDismiss = useCallback(() => {
+  const handleDismiss = useCallback((direction: number = 0) => {
     if (dismissTimer.current) clearTimeout(dismissTimer.current);
+    setExitDirection(direction);
     setActiveNotification(null);
   }, []);
 
@@ -92,36 +96,68 @@ export default function MessageNotificationBanner() {
     if (!activeNotification) return;
     setTab('messages');
     openChat(activeNotification.conversationId);
-    handleDismiss();
+    handleDismiss(0);
   }, [activeNotification, openChat, setTab, handleDismiss]);
 
   const handleMarkRead = useCallback(() => {
     if (!activeNotification) return;
     markConversationRead(activeNotification.conversationId);
-    handleDismiss();
+    handleDismiss(0);
   }, [activeNotification, markConversationRead, handleDismiss]);
 
   const handleSilence = useCallback(() => {
     if (!activeNotification) return;
     muteConversation(activeNotification.conversationId);
-    handleDismiss();
+    handleDismiss(0);
   }, [activeNotification, muteConversation, handleDismiss]);
 
   const toggleExpand = useCallback(() => {
     setExpanded(prev => !prev);
   }, []);
 
+  // Swipe handler — determine exit direction
+  const handleDragEnd = useCallback((event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    const offset = info.offset.x;
+    const velocity = info.velocity.x;
+
+    // Swipe threshold: either moved far enough OR moved fast enough
+    if (Math.abs(offset) > 80 || Math.abs(velocity) > 400) {
+      if (offset < 0) {
+        handleDismiss(-1); // swipe left → exit left
+      } else {
+        handleDismiss(1); // swipe right → exit right
+      }
+    }
+    // If not enough swipe, Framer Motion snaps back to center
+  }, [handleDismiss]);
+
+  // Exit animation variants based on swipe direction
+  const exitVariants = {
+    exit: exitDirection === -1
+      ? { x: -500, opacity: 0, scale: 0.9, transition: { duration: 0.25, ease: 'easeOut' } }
+      : exitDirection === 1
+        ? { x: 500, opacity: 0, scale: 0.9, transition: { duration: 0.25, ease: 'easeOut' } }
+        : { y: -120, opacity: 0, scale: 0.95, transition: { type: 'spring', damping: 25, stiffness: 350 } },
+  };
+
   return (
     <AnimatePresence>
       {activeNotification && (
         <motion.div
+          key={activeNotification.id}
           initial={{ y: -120, opacity: 0, scale: 0.95 }}
           animate={{ y: 0, opacity: 1, scale: 1 }}
-          exit={{ y: -120, opacity: 0, scale: 0.95 }}
+          exit={exitVariants.exit}
           transition={{ type: 'spring', damping: 25, stiffness: 350 }}
           className="fixed top-2 left-2 right-2 z-[100] mx-auto max-w-[420px]"
+          style={{ touchAction: 'pan-y' }}
         >
-          <div
+          <motion.div
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.4}
+            onDragEnd={handleDragEnd}
+            whileDrag={{ scale: 0.97, cursor: 'grabbing' }}
             className="rounded-2xl overflow-hidden"
             style={{
               background: 'rgba(18, 25, 42, 0.97)',
@@ -165,7 +201,7 @@ export default function MessageNotificationBanner() {
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <span className="text-[10px] text-kinzola-muted">maintenant</span>
                     <button
-                      onClick={handleDismiss}
+                      onClick={(e) => { e.stopPropagation(); handleDismiss(0); }}
                       className="w-5 h-5 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors cursor-pointer"
                     >
                       <X className="w-3 h-3 text-kinzola-muted" />
@@ -212,7 +248,7 @@ export default function MessageNotificationBanner() {
                 {/* Expand button */}
                 {activeNotification.message.length > 40 && (
                   <button
-                    onClick={toggleExpand}
+                    onClick={(e) => { e.stopPropagation(); toggleExpand(); }}
                     className="flex items-center gap-0.5 mt-0.5 cursor-pointer"
                   >
                     <ChevronUp
@@ -238,7 +274,7 @@ export default function MessageNotificationBanner() {
               {/* Répondre */}
               <motion.button
                 whileTap={{ scale: 0.92 }}
-                onClick={handleReply}
+                onClick={(e) => { e.stopPropagation(); handleReply(); }}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full cursor-pointer transition-colors"
                 style={{
                   background: 'rgba(43, 127, 255, 0.15)',
@@ -254,7 +290,7 @@ export default function MessageNotificationBanner() {
               {/* Marquer comme lu */}
               <motion.button
                 whileTap={{ scale: 0.92 }}
-                onClick={handleMarkRead}
+                onClick={(e) => { e.stopPropagation(); handleMarkRead(); }}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full cursor-pointer transition-colors"
                 style={{
                   background: 'rgba(74, 222, 128, 0.1)',
@@ -270,7 +306,7 @@ export default function MessageNotificationBanner() {
               {/* Silence */}
               <motion.button
                 whileTap={{ scale: 0.92 }}
-                onClick={handleSilence}
+                onClick={(e) => { e.stopPropagation(); handleSilence(); }}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full cursor-pointer transition-colors"
                 style={{
                   background: 'rgba(239, 68, 68, 0.1)',
@@ -283,7 +319,7 @@ export default function MessageNotificationBanner() {
                 </span>
               </motion.button>
             </div>
-          </div>
+          </motion.div>
         </motion.div>
       )}
     </AnimatePresence>

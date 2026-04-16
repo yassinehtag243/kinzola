@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { Heart, X, MessageCircle } from 'lucide-react';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
 
@@ -9,12 +9,7 @@ import { useKinzolaStore } from '@/store/use-kinzola-store';
  * MatchNotificationBanner
  *
  * Bannière in-app qui glisse du haut de l'écran quand il y a un match.
- * Similaire aux notifications WhatsApp / Instagram / Tinder.
- *
- * - S'affiche pendant 5 secondes puis disparaît automatiquement
- * - Cliquable pour ouvrir la conversation
- * - Bouton fermer manuel
- * - Z-index très élevé pour être au-dessus de tout
+ * Swipeable left/right to dismiss. Auto-dismiss after 5 seconds.
  */
 export default function MatchNotificationBanner() {
   const {
@@ -28,24 +23,25 @@ export default function MatchNotificationBanner() {
 
   const [visible, setVisible] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const [exitDirection, setExitDirection] = useState<number>(0); // -1=left, 1=right, 0=up
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Réagir au match
   useEffect(() => {
     if (showMatchModal && matchProfile && !dismissed) {
-      // Petit délai pour que la bannière apparaisse après le début du modal
       const showTimer = setTimeout(() => {
         setVisible(true);
       }, 300);
 
-      // Auto-dismiss après 5 secondes
-      const hideTimer = setTimeout(() => {
+      hideTimerRef.current = setTimeout(() => {
+        setExitDirection(0);
         setVisible(false);
         setDismissed(false);
       }, 5300);
 
       return () => {
         clearTimeout(showTimer);
-        clearTimeout(hideTimer);
+        if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
       };
     } else {
       setVisible(false);
@@ -53,9 +49,11 @@ export default function MatchNotificationBanner() {
     }
   }, [showMatchModal, matchProfile, dismissed]);
 
-  const handleDismiss = useCallback(() => {
+  const handleDismiss = useCallback((direction: number = 0) => {
+    setExitDirection(direction);
     setVisible(false);
     setDismissed(true);
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
   }, []);
 
   const handleTap = useCallback(() => {
@@ -71,19 +69,46 @@ export default function MatchNotificationBanner() {
     setVisible(false);
   }, [matchProfile, conversations, setTab, openChat, setShowMatchModal]);
 
+  const handleDragEnd = useCallback((event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    const offset = info.offset.x;
+    const velocity = info.velocity.x;
+
+    if (Math.abs(offset) > 80 || Math.abs(velocity) > 400) {
+      if (offset < 0) {
+        handleDismiss(-1);
+      } else {
+        handleDismiss(1);
+      }
+    }
+  }, [handleDismiss]);
+
+  const exitVariants = {
+    exit: exitDirection === -1
+      ? { x: -500, opacity: 0, scale: 0.9, transition: { duration: 0.25, ease: 'easeOut' } }
+      : exitDirection === 1
+        ? { x: 500, opacity: 0, scale: 0.9, transition: { duration: 0.25, ease: 'easeOut' } }
+        : { y: -120, opacity: 0, transition: { type: 'spring', damping: 25, stiffness: 300 } },
+  };
+
   return (
     <AnimatePresence>
       {visible && matchProfile && (
         <motion.div
+          key={`match-${matchProfile.id}-${Date.now()}`}
           initial={{ y: -120, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          exit={{ y: -120, opacity: 0 }}
+          exit={exitVariants.exit}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           className="fixed top-0 left-2 right-2 z-[200] mx-auto max-w-md"
-          style={{ marginTop: 'max(env(safe-area-inset-top, 8px), 8px)' }}
+          style={{ marginTop: 'max(env(safe-area-inset-top, 8px), 8px)', touchAction: 'pan-y' }}
         >
-          {/* Notification card */}
-          <div
+          {/* Notification card — swipeable */}
+          <motion.div
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.4}
+            onDragEnd={handleDragEnd}
+            whileDrag={{ scale: 0.97, cursor: 'grabbing' }}
             className="relative overflow-hidden rounded-2xl px-4 py-3 flex items-center gap-3 cursor-pointer active:scale-[0.98] transition-transform"
             style={{
               background: 'linear-gradient(135deg, rgba(255,77,141,0.95) 0%, rgba(255,45,109,0.95) 100%)',
@@ -140,9 +165,9 @@ export default function MatchNotificationBanner() {
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                handleDismiss();
+                handleDismiss(0);
               }}
-              className="relative z-10 flex-shrink-0 w-7 h-7 rounded-full bg-white/20 flex items-center justify-center active:bg-white/30 transition-colors"
+              className="relative z-10 flex-shrink-0 w-7 h-7 rounded-full bg-white/20 flex items-center justify-center active:bg-white/30 transition-colors cursor-pointer"
             >
               <X className="w-3.5 h-3.5 text-white" />
             </button>
@@ -154,7 +179,7 @@ export default function MatchNotificationBanner() {
               animate={{ scale: [1, 2.5, 1], opacity: [0.5, 0, 0.5] }}
               transition={{ duration: 2, repeat: Infinity }}
             />
-          </div>
+          </motion.div>
         </motion.div>
       )}
     </AnimatePresence>
