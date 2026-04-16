@@ -115,3 +115,23 @@ Stage Summary:
 - 7 files changed, 322 insertions, 13 deletions
 - Build successful, pushed to production (master:main)
 - All features deployed to https://kinzola.vercel.app/
+---
+Task ID: notification-fix
+Agent: main
+Task: Fix notification Reply button, silent mode, and heads-up display
+
+Work Log:
+- Fixed banner "Répondre" button: added 3 focus attempts (RAF + 200ms + 600ms) for mobile reliability
+- Fixed banner: delay dismiss by 100ms so Zustand states propagate before unmount
+- Fixed Service Worker push handler: added silent:true + vibrate:[200,100,200]
+- Fixed use-browser-notifications.ts: added vibrate to all 6 notification call sites
+- Fixed store (simulateReply + startRandomMessages): added vibrate to notifications
+- Added URL param handling in app-shell: ?action=reply&conv=...&name=... when opening from system notification outside app
+- Fixed setup-database route: dynamic import Supabase to prevent build crash (no Supabase configured)
+- Resolved merge conflicts with remote main, kept local fixes
+- Build successful, pushed to production
+
+Stage Summary:
+- 6 files modified: chat-input-bar.tsx, message-notification-banner.tsx, sw.js, use-browser-notifications.ts, use-kinzola-store.ts, app-shell.tsx
+- 1 file rewritten: setup-database/route.ts (dynamic Supabase import)
+- Pushed to https://kinzola.vercel.app/ (master:main)

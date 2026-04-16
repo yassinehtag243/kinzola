@@ -67,6 +67,7 @@ export default function NewsScreen() {
     commentingPostId,
     addComment,
     setCommentingPostId,
+    setTab,
   } = useKinzolaStore();
 
   const [viewingStoryIndex, setViewingStoryIndex] = useState<number | null>(null);
@@ -165,6 +166,16 @@ export default function NewsScreen() {
       }, 150);
     }
   }, [showCommentBar, commentingPostId, posts]);
+
+  // Listen for global story creator open request (from FAB in app-shell)
+  useEffect(() => {
+    const handleOpenCreator = () => {
+      setTab('news');
+      setShowStoryCreator(true);
+    };
+    window.addEventListener('open-story-creator', handleOpenCreator);
+    return () => window.removeEventListener('open-story-creator', handleOpenCreator);
+  }, [setTab]);
 
   const handleOpenComments = (postId: string) => {
     setCommentingPostId(postId);

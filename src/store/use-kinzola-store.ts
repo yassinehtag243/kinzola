@@ -925,7 +925,7 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       type: imageUrl ? 'photo' : 'text',
     };
-    set({ stories: [...stories, newStory] });
+    set({ stories: [newStory, ...stories] });
   },
   likePost: (postId) => {
     const { posts } = get();

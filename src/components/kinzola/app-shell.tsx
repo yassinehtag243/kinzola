@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Plus } from 'lucide-react';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
 import WelcomeScreen from './auth/welcome-screen';
 import LoginScreen from './auth/login-screen';
@@ -239,7 +240,7 @@ export default function AppShell() {
             animate="animate"
             exit="exit"
             transition={screenTransition}
-            className="flex flex-col h-full"
+            className="flex flex-col h-full relative"
           >
             {/* Tab Content */}
             <div className="flex-1 overflow-hidden">
@@ -248,6 +249,50 @@ export default function AppShell() {
               {currentTab === 'messages' && <MessagesScreen />}
               {currentTab === 'profile' && <ProfileScreen />}
             </div>
+
+            {/* Floating Story Button — above bottom nav */}
+            <motion.button
+              onClick={() => {
+                if (currentTab !== 'news') {
+                  setTab('news');
+                  // Small delay to let the tab switch render, then open creator
+                  setTimeout(() => {
+                    window.dispatchEvent(new Event('open-story-creator'));
+                  }, 400);
+                } else {
+                  window.dispatchEvent(new Event('open-story-creator'));
+                }
+              }}
+              whileTap={{ scale: 0.85 }}
+              whileHover={{ scale: 1.05 }}
+              className="absolute bottom-20 left-1/2 z-40"
+              style={{
+                transform: 'translateX(-50%)',
+                width: 52,
+                height: 52,
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #2B7FFF, #FF4D8D)',
+                boxShadow: '0 4px 20px rgba(43, 127, 255, 0.5), 0 0 0 3px rgba(43, 127, 255, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '2px solid rgba(255, 255, 255, 0.2)',
+              }}
+            >
+              <motion.div
+                animate={{ rotate: currentTab === 'news' ? 45 : 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+              >
+                <Plus className="w-6 h-6 text-white" strokeWidth={2.5} />
+              </motion.div>
+              {/* Pulse ring */}
+              <motion.div
+                className="absolute inset-0 rounded-full"
+                style={{ border: '2px solid rgba(43, 127, 255, 0.3)' }}
+                animate={{ scale: [1, 1.4], opacity: [0.5, 0] }}
+                transition={{ duration: 2, repeat: Infinity, ease: 'easeOut' }}
+              />
+            </motion.button>
 
             {/* Bottom Navigation */}
             <BottomNav />

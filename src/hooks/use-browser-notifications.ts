@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useCallback, useRef } from 'react';
-import { useKinzolaStore } from '@/store/use-kinzola-store';
 
 /**
  * useBrowserNotifications
@@ -90,25 +89,9 @@ export function useBrowserNotifications() {
     }
   }, []);
 
-  // Watch for new notifications and show browser notifications
-  const notifications = useKinzolaStore((s) => s.notifications);
-  const prevCountRef = useRef(0);
-
-  useEffect(() => {
-    const currentCount = notifications.length;
-    if (currentCount > prevCountRef.current && prevCountRef.current > 0) {
-      // New notification arrived!
-      const newNotif = notifications[0]; // Most recent
-      if (newNotif && !newNotif.read) {
-        const icon = NOTIFICATION_ICONS[newNotif.type] || NOTIFICATION_ICONS.default;
-        showNotification(`${icon} ${newNotif.title}`, {
-          body: newNotif.message,
-          tag: `kinzola-notif-${newNotif.id}`,
-        });
-      }
-    }
-    prevCountRef.current = currentCount;
-  }, [notifications, showNotification]);
+  // NOTE: The useEffect that watched notifications.length and auto-called showNotification
+  // was removed to prevent duplicate system notifications. The store's simulateReply and
+  // startRandomMessages already show their own Service Worker notifications directly.
 
   return { showNotification };
 }
