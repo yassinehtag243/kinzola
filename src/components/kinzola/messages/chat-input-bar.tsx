@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Smile, Mic, Send, Camera, Trash2, Loader2 } from 'lucide-react';
+import { Smile, Mic, Send, Camera, Trash2, Loader2, MicOff } from 'lucide-react';
 import { usePermission, PermissionModal, PermissionDeniedBanner, PermissionToast } from './permission-manager';
 import dynamic from 'next/dynamic';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
@@ -40,6 +40,19 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
+/**
+ * Wrap a promise with a timeout. Rejects if the promise doesn't resolve in time.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    promise.then(
+      (val) => { clearTimeout(timer); resolve(val); },
+      (err) => { clearTimeout(timer); reject(err); },
+    );
+  });
+}
+
 export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendImage }: ChatInputBarProps) {
   const pendingNotificationReply = useKinzolaStore((s) => s.pendingNotificationReply);
   const setPendingNotificationReply = useKinzolaStore((s) => s.setPendingNotificationReply);
@@ -51,6 +64,9 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [micReady, setMicReady] = useState(false);       // pre-initialized?
+  const [micError, setMicError] = useState<string | null>(null); // error feedback
+  const [isWaitingForMic, setIsWaitingForMic] = useState(false); // waiting for getUserMedia
   const recordingInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // MediaRecorder refs
@@ -97,6 +113,45 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
   const recordingTimeRef = useRef(0);
   const startRecordingInternalRef = useRef<() => Promise<void>>(() => Promise.resolve());
 
+  // ─── Debounce guard for mic button (prevent touch+mouse double-fire) ───
+  const micClickLockRef = useRef(false);
+  const MIC_CLICK_LOCK_MS = 400;
+
+  // ─── Pre-initialize microphone on mount ───
+  useEffect(() => {
+    let mounted = true;
+
+    async function preInitMic() {
+      try {
+        // Only check if permission is already granted
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (!mounted) {
+          // Component unmounted while waiting — clean up stream
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        // Permission granted! Keep a warm stream ready.
+        // We store the stream but do NOT start recording.
+        // We'll stop it when starting actual recording and re-acquire.
+        stream.getTracks().forEach((t) => t.stop());
+        setMicReady(true);
+        console.log('[Voice] Microphone pre-initialized successfully');
+      } catch {
+        // Permission not granted or denied — that's OK, we'll ask later
+        if (mounted) setMicReady(false);
+        console.log('[Voice] Microphone pre-init skipped (permission not yet granted)');
+      }
+    }
+
+    // Delay pre-init slightly to avoid interfering with page load
+    const timer = setTimeout(preInitMic, 2000);
+
+    return () => {
+      mounted = false;
+      clearTimeout(timer);
+    };
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -113,33 +168,26 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
   const [showSendFromReply, setShowSendFromReply] = useState(false);
 
   // Auto-focus input when notification reply is triggered
-  // Multiple attempts for mobile reliability: RAF → setTimeout 200ms → setTimeout 600ms
   useEffect(() => {
     if (!pendingNotificationReply) return;
 
-    // Always show send button immediately
     setShowSendFromReply(true);
 
     const attemptFocus = () => {
       if (inputRef.current) {
         inputRef.current.focus();
-        // On mobile, click() is more reliable than focus() for opening keyboard
         inputRef.current.click();
         return true;
       }
       return false;
     };
 
-    // Attempt 1: Double RAF (next paint)
     const raf = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        if (attemptFocus()) {
-          setPendingNotificationReply(null);
-        }
+        if (attemptFocus()) setPendingNotificationReply(null);
       });
     });
 
-    // Attempt 2: After 200ms (mobile DOM ready)
     const t1 = setTimeout(() => {
       if (pendingNotificationReply) {
         attemptFocus();
@@ -147,7 +195,6 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
       }
     }, 200);
 
-    // Attempt 3: After 600ms (fallback for slow devices)
     const t2 = setTimeout(() => {
       attemptFocus();
       setPendingNotificationReply(null);
@@ -159,6 +206,13 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
       clearTimeout(t2);
     };
   }, [pendingNotificationReply, setPendingNotificationReply]);
+
+  // ─── Auto-dismiss mic error after 3 seconds ───
+  useEffect(() => {
+    if (!micError) return;
+    const t = setTimeout(() => setMicError(null), 3000);
+    return () => clearTimeout(t);
+  }, [micError]);
 
   // ─── Handle permission grant ───
   useEffect(() => {
@@ -172,6 +226,7 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
     }
     if (permissions.microphone === 'granted' && pendingActionRef.current === 'microphone') {
       pendingActionRef.current = null;
+      setMicReady(true);
       startRecordingInternalRef.current();
     }
   }, [permissions]);
@@ -183,6 +238,7 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
   const cancelRecording = useCallback(() => {
     isRecordingRef.current = false;
     setIsRecording(false);
+    setIsWaitingForMic(false);
     if (recordingInterval.current) {
       clearInterval(recordingInterval.current);
       recordingInterval.current = null;
@@ -201,10 +257,19 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
   const startRecordingInternal = useCallback(async () => {
     // NOTE: isRecordingRef + setIsRecording(true) already set by handleMicDown for instant feedback.
     // This function handles the actual getUserMedia + MediaRecorder setup.
+    setIsWaitingForMic(true);
+    setMicError(null);
+
     try {
-      // Simple constraints — no sampleRate/channelCount (causes failures on mobile)
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Use timeout to prevent hanging if browser permission dialog is dismissed
+      const stream = await withTimeout(
+        navigator.mediaDevices.getUserMedia({ audio: true }),
+        15000,
+        'getUserMedia'
+      );
       mediaStreamRef.current = stream;
+      setMicReady(true); // mark as ready for future fast starts
+      setIsWaitingForMic(false);
 
       // Pick the best MIME type the browser supports natively
       const mimeTypes = [
@@ -237,6 +302,7 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
 
       mediaRecorder.onerror = (e) => {
         console.error('[Voice] MediaRecorder error:', e);
+        setMicError('Erreur pendant l\'enregistrement');
         cancelRecording();
       };
 
@@ -255,9 +321,19 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
       console.log('[Voice] Recording started, MIME:', mediaRecorder.mimeType);
     } catch (err) {
       console.error('[Voice] Microphone access failed:', err);
+      setIsWaitingForMic(false);
       isRecordingRef.current = false;
       setIsRecording(false);
       setRecordingTime(0);
+      setMicReady(false);
+
+      // Show user-friendly error
+      const msg = err instanceof Error
+        ? err.message.includes('timed out')
+          ? 'Délai d\'attente dépassé. Réessayez.'
+          : 'Microphone inaccessible. Vérifiez les autorisations.'
+        : 'Microphone inaccessible. Vérifiez les autorisations.';
+      setMicError(msg);
     }
   }, [cancelRecording]);
 
@@ -267,6 +343,7 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
     if (!isRecordingRef.current) return;
     isRecordingRef.current = false;
     setIsRecording(false);
+    setIsWaitingForMic(false);
 
     if (recordingInterval.current) {
       clearInterval(recordingInterval.current);
@@ -288,13 +365,10 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
     setIsProcessing(true);
 
     // When stop() fires: one last ondataavailable, THEN onstop.
-    // We create the blob inside onstop to capture ALL chunks including the final one.
     recorder.onstop = async () => {
-      // Now ALL chunks have been collected
       const allChunks = [...audioChunksRef.current];
       audioChunksRef.current = [];
 
-      // Stop media stream
       if (stream) { stream.getTracks().forEach((t) => t.stop()); mediaStreamRef.current = null; }
       mediaRecorderRef.current = null;
 
@@ -306,7 +380,6 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
         return;
       }
 
-      // Create blob from ALL collected chunks
       const blob = new Blob(allChunks, { type: recorder.mimeType || 'audio/webm' });
       console.log('[Voice] Blob created, size:', blob.size, 'type:', blob.type, 'chunks:', allChunks.length);
 
@@ -318,7 +391,6 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
       }
 
       try {
-        // Convert to data URL
         const dataUrl = await blobToDataUrl(blob);
 
         const mins = Math.floor(elapsed / 60);
@@ -347,26 +419,44 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
   }, []);
 
   // ═══════════════════════════════════════════════════════════
-  //  MIC BUTTON HANDLERS — Tap to start, buttons to send/cancel
+  //  MIC BUTTON HANDLER — Single unified handler, anti-double-fire
   // ═══════════════════════════════════════════════════════════
 
-  const handleMicDown = useCallback(async (e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault();
+  const handleMicClick = useCallback(() => {
+    // Guard: prevent double-fire from touch+mouse on mobile
+    if (micClickLockRef.current) return;
     if (message.trim() || pendingImage || isRecordingRef.current || isProcessing) return;
-    // INSTANT feedback: show recording UI immediately, before async getUserMedia
+
+    // Lock for 400ms to absorb the duplicate event
+    micClickLockRef.current = true;
+    setTimeout(() => { micClickLockRef.current = false; }, MIC_CLICK_LOCK_MS);
+
+    // INSTANT visual feedback
     isRecordingRef.current = true;
     setIsRecording(true);
     setRecordingTime(0);
-    startRecordingInternal();
-  }, [message, pendingImage, startRecordingInternal, isProcessing]);
+    setMicError(null);
 
-  const handleMicUp = useCallback(() => {
-    // Recording is managed by the recording UI buttons (send/cancel)
-  }, []);
-
-  const handleMicLeave = useCallback(() => {
-    // Recording is managed by the recording UI buttons (send/cancel)
-  }, []);
+    // If mic was pre-initialized (permission already granted), start directly
+    if (micReady) {
+      startRecordingInternal();
+    } else {
+      // First time: go through the permission modal flow
+      requestPermission('microphone').then((granted) => {
+        if (granted) {
+          // Permission was already granted, start recording
+          setMicReady(true);
+          startRecordingInternal();
+        } else {
+          // Permission modal will show, recording will start via pendingActionRef effect
+          pendingActionRef.current = 'microphone';
+          // Reset the instant feedback since we're waiting for permission
+          isRecordingRef.current = false;
+          setIsRecording(false);
+        }
+      });
+    }
+  }, [message, pendingImage, startRecordingInternal, isProcessing, micReady, requestPermission]);
 
   // ─── sendMessage ───
   const sendMessage = useCallback(() => {
@@ -474,6 +564,32 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
         )}
       </AnimatePresence>
 
+      {/* ─── Mic Error Toast ─── */}
+      <AnimatePresence>
+        {micError && (
+          <motion.div
+            key="mic-error-toast"
+            initial={{ opacity: 0, y: -10, x: '-50%' }}
+            animate={{ opacity: 1, y: 0, x: '-50%' }}
+            exit={{ opacity: 0, y: -10, x: '-50%' }}
+            transition={{ duration: 0.25 }}
+            className="fixed top-4 left-1/2 z-[80] max-w-[calc(100vw-2rem)] w-[85vw]"
+          >
+            <div
+              className="glass-strong rounded-2xl px-4 py-3 flex items-center gap-3 shadow-lg"
+              style={{ border: '1px solid rgba(239, 68, 68, 0.2)', background: 'rgba(239, 68, 68, 0.1)' }}
+            >
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(239, 68, 68, 0.15)' }}>
+                <MicOff className="w-4 h-4" style={{ color: '#f87171' }} />
+              </div>
+              <p className="text-xs leading-relaxed flex-1 min-w-0" style={{ color: '#f87171' }}>
+                {micError}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ─── Permission Denied / Toast ─── */}
       <AnimatePresence>
         {showDenied && <PermissionDeniedBanner key={`denied-${showDenied}`} type={showDenied} onRetry={() => handleRetry(showDenied)} onDismiss={dismissDenied} />}
@@ -514,22 +630,26 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
                   </>
                 ) : (
                   <>
-                    {/* Pulsing red dot */}
-                    <motion.div
-                      animate={{ scale: [1, 1.4, 1], opacity: [1, 0.5, 1] }}
-                      transition={{ type: 'tween', duration: 1.2, repeat: Infinity }}
-                      className="w-3 h-3 rounded-full bg-red-500 flex-shrink-0"
-                    />
+                    {/* Pulsing red dot (or waiting indicator) */}
+                    {isWaitingForMic ? (
+                      <Loader2 className="w-4 h-4 text-red-400 animate-spin flex-shrink-0" />
+                    ) : (
+                      <motion.div
+                        animate={{ scale: [1, 1.4, 1], opacity: [1, 0.5, 1] }}
+                        transition={{ type: 'tween', duration: 1.2, repeat: Infinity }}
+                        className="w-3 h-3 rounded-full bg-red-500 flex-shrink-0"
+                      />
+                    )}
 
-                    {/* Timer */}
+                    {/* Timer / Status */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-base font-mono font-bold" style={{ color: '#FF4D8D' }}>
-                          {formatTime(recordingTime)}
+                          {isWaitingForMic ? '...' : formatTime(recordingTime)}
                         </span>
                       </div>
                       <p className="text-[10px] text-kinzola-muted mt-0.5">
-                        Appuyez sur ✓ pour envoyer
+                        {isWaitingForMic ? 'Activation du microphone...' : 'Appuyez sur \u2713 pour envoyer'}
                       </p>
                     </div>
 
@@ -544,22 +664,24 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
                       <Trash2 className="w-4 h-4 text-red-400" />
                     </motion.button>
 
-                    {/* Send button */}
-                    <motion.button
-                      key="send-voice"
-                      initial={{ scale: 0.8, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      whileTap={{ scale: 0.85 }}
-                      onClick={stopAndSend}
-                      className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer"
-                      style={{
-                        background: 'linear-gradient(135deg, #2B7FFF, #FF4D8D)',
-                        boxShadow: '0 0 20px rgba(43, 127, 255, 0.4)',
-                      }}
-                      aria-label="Envoyer le message vocal"
-                    >
-                      <Send className="w-4 h-4 text-white" />
-                    </motion.button>
+                    {/* Send button (only show when actually recording, not waiting) */}
+                    {!isWaitingForMic && (
+                      <motion.button
+                        key="send-voice"
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        whileTap={{ scale: 0.85 }}
+                        onClick={stopAndSend}
+                        className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer"
+                        style={{
+                          background: 'linear-gradient(135deg, #2B7FFF, #FF4D8D)',
+                          boxShadow: '0 0 20px rgba(43, 127, 255, 0.4)',
+                        }}
+                        aria-label="Envoyer le message vocal"
+                      >
+                        <Send className="w-4 h-4 text-white" />
+                      </motion.button>
+                    )}
                   </>
                 )}
               </div>
@@ -701,11 +823,7 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
                         rotate: isEmpty ? 0 : 90,
                       }}
                       transition={{ duration: 0.35, ease: 'easeInOut' }}
-                      onMouseDown={handleMicDown}
-                      onMouseUp={handleMicUp}
-                      onMouseLeave={handleMicLeave}
-                      onTouchStart={handleMicDown}
-                      onTouchEnd={handleMicUp}
+                      onClick={handleMicClick}
                       className="absolute inset-0 rounded-full glass flex items-center justify-center cursor-pointer transition-all duration-300 select-none"
                       aria-label="Enregistrer un message vocal"
                       style={{ touchAction: 'none' }}
