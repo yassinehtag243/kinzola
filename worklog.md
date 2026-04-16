@@ -96,3 +96,22 @@ Implemented 3 major features: Rich Push Notifications, Story Viewer from Discuss
 - No existing functionality was broken
 - Pre-existing lint errors in other files were not introduced by these changes
 - All notifications now properly include `conversationId` and `participantName` in data for Service Worker action handling
+---
+Task ID: 1-7
+Agent: main
+Task: Multiple UI fixes and feature additions for Kinzola dating app
+
+Work Log:
+- Fixed Discussions tab click behavior: separated name click (opens chat) from photo click (opens stories or chat)
+- Updated OnlineUsersSection to support stories: added onViewStory and storyUserIds props, photo click opens stories if available
+- Updated New Matches section: photo click opens stories if user has stories, otherwise opens chat
+- Added createStory action to Zustand store (stories state management)
+- Added "Votre story" button in Actualités tab stories bar (Instagram-style + button on avatar)
+- Added Story Creator modal (bottom sheet) with text input, photo upload, 24h expiration info, publish button
+- Fixed notification Reply action: now sets pendingNotificationReply so chat input auto-focuses with send button visible
+- Added silent:true to all browser notification calls (useBrowserNotifications, showMessageNotification, sw.js) to block phone default notification sound while keeping custom app sound
+
+Stage Summary:
+- 7 files changed, 322 insertions, 13 deletions
+- Build successful, pushed to production (master:main)
+- All features deployed to https://kinzola.vercel.app/

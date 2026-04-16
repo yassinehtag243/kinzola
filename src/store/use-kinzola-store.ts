@@ -742,6 +742,7 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
                 tag: `kinzola-msg-${conversationId}-${Date.now()}`,
                 renotify: true,
                 requireInteraction: true,
+                silent: true,
                 data: { conversationId, participantName: conv.participant.name },
                 actions: [
                   { action: 'reply', title: 'Répondre' },

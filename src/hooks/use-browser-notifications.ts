@@ -52,36 +52,32 @@ export function useBrowserNotifications() {
           reg.showNotification(title, {
             icon: '/favicon.ico',
             badge: '/favicon.ico',
-            vibrate: [200, 100, 200],
             tag: 'kinzola-' + Date.now(),
             renotify: true,
             requireInteraction: true,
-            silent: true,
             ...options,
           });
         }).catch(() => {
           // Fallback to basic Notification if SW not ready
           const notif = new Notification(title, {
             icon: '/favicon.ico',
-            vibrate: [200, 100, 200],
             tag: 'kinzola-' + Date.now(),
             renotify: true,
-            silent: true,
+            requireInteraction: true,
             ...options,
           });
-          setTimeout(() => { notif.close(); }, 5000);
+          setTimeout(() => { notif.close(); }, 6000);
         });
       } else {
         // No Service Worker — fallback to basic Notification
         const notif = new Notification(title, {
           icon: '/favicon.ico',
-          vibrate: [200, 100, 200],
           tag: 'kinzola-' + Date.now(),
           renotify: true,
-          silent: true,
+          requireInteraction: true,
           ...options,
         });
-        setTimeout(() => { notif.close(); }, 5000);
+        setTimeout(() => { notif.close(); }, 6000);
       }
     } catch {
       // Notification API might fail in some contexts (iframe, etc.)
@@ -133,11 +129,9 @@ export function showMessageNotification(
           body,
           icon: icon || '/favicon.ico',
           badge: '/favicon.ico',
-          vibrate: [200, 100, 200],
           tag: `kinzola-msg-${conversationId}-${Date.now()}`,
           renotify: true,
           requireInteraction: true,
-          silent: true,
           data: { conversationId, participantName },
           actions: [
             { action: 'reply', title: 'Répondre' },
@@ -147,12 +141,12 @@ export function showMessageNotification(
         });
       }).catch(() => {
         // Fallback
-        const notif = new Notification(title, { body, icon: icon || '/favicon.ico', silent: true });
-        setTimeout(() => { notif.close(); }, 5000);
+        const notif = new Notification(title, { body, icon: icon || '/favicon.ico' });
+        setTimeout(() => { notif.close(); }, 6000);
       });
     } else {
-      const notif = new Notification(title, { body, icon: icon || '/favicon.ico', silent: true });
-      setTimeout(() => { notif.close(); }, 5000);
+      const notif = new Notification(title, { body, icon: icon || '/favicon.ico' });
+      setTimeout(() => { notif.close(); }, 6000);
     }
   } catch {
     // silent fail
