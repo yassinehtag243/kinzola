@@ -34,6 +34,7 @@ export default function MessageNotificationBanner() {
   const setTab = useKinzolaStore((s) => s.setTab);
   const markConversationRead = useKinzolaStore((s) => s.markConversationRead);
   const muteConversation = useKinzolaStore((s) => s.muteConversation);
+  const setPendingNotificationReply = useKinzolaStore((s) => s.setPendingNotificationReply);
 
   // Watch for new message notifications
   useEffect(() => {
@@ -96,8 +97,12 @@ export default function MessageNotificationBanner() {
     if (!activeNotification) return;
     setTab('messages');
     openChat(activeNotification.conversationId);
+    setPendingNotificationReply({
+      conversationId: activeNotification.conversationId,
+      participantName: activeNotification.senderName,
+    });
     handleDismiss(0);
-  }, [activeNotification, openChat, setTab, handleDismiss]);
+  }, [activeNotification, openChat, setTab, setPendingNotificationReply, handleDismiss]);
 
   const handleMarkRead = useCallback(() => {
     if (!activeNotification) return;

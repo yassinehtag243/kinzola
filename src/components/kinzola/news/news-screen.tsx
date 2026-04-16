@@ -60,6 +60,7 @@ export default function NewsScreen() {
     user,
     likePost,
     createPost,
+    createStory,
     notifications,
     showNotifications,
     setShowNotifications,
@@ -81,6 +82,14 @@ export default function NewsScreen() {
   const [composeVisibility, setComposeVisibility] = useState<'public' | 'friends'>('public');
   const [isPublishing, setIsPublishing] = useState(false);
   const [showPublishSuccess, setShowPublishSuccess] = useState(false);
+
+  // Story creation state
+  const [showStoryCreator, setShowStoryCreator] = useState(false);
+  const [storyText, setStoryText] = useState('');
+  const [storyImage, setStoryImage] = useState('');
+  const storyPhotoInputRef = useRef<HTMLInputElement>(null);
+  const [isCreatingStory, setIsCreatingStory] = useState(false);
+  const [showStorySuccess, setShowStorySuccess] = useState(false);
 
   const commentInputRef = useRef<HTMLInputElement>(null);
   const commentListRef = useRef<HTMLDivElement>(null);
@@ -196,6 +205,20 @@ export default function NewsScreen() {
     }, 500);
   };
 
+  const handleCreateStory = () => {
+    if (!storyText.trim() && !storyImage.trim()) return;
+    setIsCreatingStory(true);
+    setTimeout(() => {
+      createStory(storyText.trim(), storyImage || undefined);
+      setStoryText('');
+      setStoryImage('');
+      setShowStoryCreator(false);
+      setIsCreatingStory(false);
+      setShowStorySuccess(true);
+      setTimeout(() => setShowStorySuccess(false), 1500);
+    }, 500);
+  };
+
   return (
     <div className="flex flex-col h-full relative">
       {/* Header with title + notification bell */}
@@ -251,6 +274,57 @@ export default function NewsScreen() {
       {/* Stories bar - horizontal scroll */}
       <div className="flex-shrink-0 px-5 pb-3 pt-2">
         <div className="flex gap-3 overflow-x-auto no-scrollbar">
+          {/* Your Story button (first) */}
+          <button
+            onClick={() => setShowStoryCreator(true)}
+            className="flex flex-col items-center gap-1.5 flex-shrink-0 cursor-pointer"
+          >
+            <div className="relative w-16 h-16">
+              <div
+                className="w-16 h-16 rounded-full p-[2px]"
+                style={{
+                  background: showStorySuccess
+                    ? 'linear-gradient(135deg, #22C55E, #16A34A)'
+                    : 'linear-gradient(135deg, #2B7FFF, #FF4D8D)',
+                }}
+              >
+                <div className="w-full h-full rounded-full p-[2px] bg-kinzola-bg">
+                  {user?.photoUrl ? (
+                    <img
+                      src={user.photoUrl}
+                      alt="Votre story"
+                      className="w-full h-full rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full rounded-full bg-white/10 flex items-center justify-center">
+                      <Plus className="w-5 h-5 text-kinzola-muted" />
+                    </div>
+                  )}
+                </div>
+              </div>
+              {/* Plus badge */}
+              <motion.div
+                animate={showStorySuccess ? { scale: [1, 1.3, 1] } : {}}
+                className="absolute -bottom-0.5 -right-0.5 w-6 h-6 rounded-full flex items-center justify-center"
+                style={{
+                  background: 'linear-gradient(135deg, #2B7FFF, #FF4D8D)',
+                  boxShadow: '0 2px 8px rgba(43, 127, 255, 0.4)',
+                  border: '2px solid var(--color-kinzola-bg, #060E1A)',
+                }}
+              >
+                {showStorySuccess ? (
+                  <Check className="w-3 h-3 text-white" />
+                ) : (
+                  <Plus className="w-3 h-3 text-white" />
+                )}
+              </motion.div>
+            </div>
+            <span className="text-[10px] text-kinzola-muted truncate w-16 text-center">
+              Votre story
+            </span>
+          </button>
+
+          {/* Other users' stories */}
           {stories.map((story, index) => (
             <button
               key={story.id}
@@ -781,6 +855,168 @@ export default function NewsScreen() {
             post={posts.find(p => p.id === sharingPostId)!}
             onClose={() => setSharingPostId(null)}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Story Creator Modal */}
+      <AnimatePresence>
+        {showStoryCreator && (
+          <motion.div
+            key="story-creator"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end justify-center"
+            onClick={() => { if (!isCreatingStory) setShowStoryCreator(false); }}
+          >
+            {/* Backdrop */}
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+
+            {/* Bottom sheet */}
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 30, stiffness: 350 }}
+              className="relative w-full max-w-lg rounded-t-3xl overflow-hidden"
+              style={{
+                background: 'rgba(18, 25, 42, 0.98)',
+                backdropFilter: 'blur(20px)',
+                boxShadow: '0 -10px 40px rgba(0, 0, 0, 0.5)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Handle bar */}
+              <div className="flex justify-center pt-3 pb-1">
+                <div className="w-10 h-1 rounded-full bg-white/20" />
+              </div>
+
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-3">
+                <h3 className="text-lg font-bold">Nouvelle story</h3>
+                <button
+                  onClick={() => !isCreatingStory && setShowStoryCreator(false)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors cursor-pointer"
+                  disabled={isCreatingStory}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="px-5 pb-6 space-y-4">
+                {/* Text input */}
+                <textarea
+                  placeholder="Quoi de neuf ? Ecrivez votre story..."
+                  value={storyText}
+                  onChange={(e) => setStoryText(e.target.value)}
+                  rows={3}
+                  maxLength={300}
+                  className="w-full bg-white/5 rounded-2xl px-4 py-3 text-sm placeholder:text-kinzola-muted/50 focus:outline-none resize-none leading-relaxed"
+                  style={{ border: '1px solid rgba(255, 255, 255, 0.08)' }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(43, 127, 255, 0.3)'; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)'; }}
+                />
+
+                {/* Photo input */}
+                <input
+                  ref={storyPhotoInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (ev) => {
+                        if (ev.target?.result) setStoryImage(ev.target.result as string);
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                    e.target.value = '';
+                  }}
+                />
+
+                {/* Add photo button */}
+                <button
+                  onClick={() => storyPhotoInputRef.current?.click()}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl transition-colors hover:bg-white/5 cursor-pointer"
+                  style={{ border: '1px dashed rgba(255, 255, 255, 0.15)' }}
+                >
+                  <div
+                    className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{
+                      background: 'rgba(255, 77, 141, 0.1)',
+                      border: '1px solid rgba(255, 77, 141, 0.2)',
+                    }}
+                  >
+                    <ImageIcon className="w-5 h-5 text-kinzola-pink" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">Ajouter une photo</p>
+                    <p className="text-xs text-kinzola-muted mt-0.5">Choisir dans la galerie</p>
+                  </div>
+                </button>
+
+                {/* Image preview */}
+                <AnimatePresence>
+                  {storyImage && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="relative rounded-xl overflow-hidden">
+                        <img src={storyImage} alt="Apercu story" className="w-full h-48 object-cover" />
+                        <button
+                          onClick={() => setStoryImage('')}
+                          className="absolute top-2 right-2 w-7 h-7 rounded-full glass flex items-center justify-center cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Info */}
+                <div className="flex items-center gap-2 text-[10px] text-kinzola-muted">
+                  <Clock className="w-3 h-3" />
+                  <span>Expire dans 24h</span>
+                </div>
+
+                {/* Publish button */}
+                <motion.button
+                  onClick={handleCreateStory}
+                  disabled={isCreatingStory || (!storyText.trim() && !storyImage.trim())}
+                  whileTap={{ scale: 0.95 }}
+                  className="w-full py-3.5 rounded-2xl text-sm font-bold text-white transition-all disabled:opacity-30 cursor-pointer"
+                  style={{
+                    background: (storyText.trim() || storyImage.trim())
+                      ? 'linear-gradient(135deg, #FF4D8D, #2B7FFF)'
+                      : 'rgba(255, 255, 255, 0.05)',
+                    boxShadow: (storyText.trim() || storyImage.trim())
+                      ? '0 4px 16px rgba(255, 77, 141, 0.3)'
+                      : 'none',
+                  }}
+                >
+                  {isCreatingStory ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <motion.span
+                        animate={{ rotate: 360 }}
+                        transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
+                        className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
+                      />
+                      Publication...
+                    </span>
+                  ) : (
+                    'Publier la story'
+                  )}
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

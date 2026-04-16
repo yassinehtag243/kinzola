@@ -63,6 +63,8 @@ interface OnlineUsersSectionProps {
   customNicknames: Record<string, string>;
   isLight: boolean;
   onOpenChat: (conversationId: string) => void;
+  onViewStory?: (userId: string) => void;
+  storyUserIds?: Set<string>;
 }
 
 export default function OnlineUsersSection({
@@ -71,6 +73,8 @@ export default function OnlineUsersSection({
   customNicknames,
   isLight,
   onOpenChat,
+  onViewStory,
+  storyUserIds,
 }: OnlineUsersSectionProps) {
   // ─── Build sorted online users list ───
   const onlineUsers = useMemo(() => {
@@ -163,7 +167,14 @@ export default function OnlineUsersSection({
                 delay: index * 0.04,
               }}
               whileTap={{ scale: 0.92 }}
-              onClick={() => onOpenChat(conv.id)}
+              onClick={() => {
+                const hasStory = storyUserIds?.has(conv.participant.userId);
+                if (hasStory && onViewStory) {
+                  onViewStory(conv.participant.userId);
+                } else {
+                  onOpenChat(conv.id);
+                }
+              }}
               className="flex flex-col items-center gap-1.5 flex-shrink-0 cursor-pointer group"
             >
               {/* Avatar with gradient ring */}
@@ -171,10 +182,17 @@ export default function OnlineUsersSection({
                 <div
                   className="w-[58px] h-[58px] rounded-full p-[2px] transition-transform duration-300 group-hover:scale-105"
                   style={{
-                    background: isSuperMatch
-                      ? 'linear-gradient(135deg, #FFD700, #FF4D8D, #2B7FFF)'
-                      : 'linear-gradient(135deg, #2B7FFF, #FF4D8D)',
-                    boxShadow: '0 0 18px rgba(43, 127, 255, 0.2)',
+                    background: (() => {
+                      const hasStory = storyUserIds?.has(conv.participant.userId);
+                      if (hasStory) return 'linear-gradient(135deg, #FF4D8D, #FFD700, #2B7FFF, #FF4D8D)';
+                      if (isSuperMatch) return 'linear-gradient(135deg, #FFD700, #FF4D8D, #2B7FFF)';
+                      return 'linear-gradient(135deg, #2B7FFF, #FF4D8D)';
+                    })(),
+                    boxShadow: (() => {
+                      const hasStory = storyUserIds?.has(conv.participant.userId);
+                      if (hasStory) return '0 0 18px rgba(255, 77, 141, 0.4)';
+                      return '0 0 18px rgba(43, 127, 255, 0.2)';
+                    })(),
                   }}
                 >
                   <div

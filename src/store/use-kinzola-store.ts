@@ -227,6 +227,9 @@ interface KinzolaState {
   addComment: (postId: string, content: string, isPublic: boolean) => void;
   setCommentingPostId: (postId: string | null) => void;
 
+  // Actions - Stories
+  createStory: (content: string, imageUrl?: string) => void;
+
   // Actions - Theme
   setTheme: (theme: 'light' | 'dark') => void;
 
@@ -902,6 +905,25 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
       visibility: postVisibility,
     };
     set({ posts: [newPost, ...posts] });
+  },
+  createStory: (content, imageUrl) => {
+    const { user, stories } = get();
+    if (!user) return;
+    const newStory: import('@/types').Story = {
+      id: `story-${Date.now()}`,
+      authorId: user.id,
+      authorName: user.name,
+      authorPhoto: user.photoUrl,
+      content,
+      imageUrl,
+      views: 0,
+      likes: 0,
+      comments: [],
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      type: imageUrl ? 'photo' : 'text',
+    };
+    set({ stories: [...stories, newStory] });
   },
   likePost: (postId) => {
     const { posts } = get();

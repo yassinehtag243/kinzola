@@ -52,14 +52,19 @@ export default function MessagesScreen() {
 
   const bgColor = isLight ? '#FFFFFF' : 'var(--color-kinzola-bg, #060E1A)';
 
-  // Handle conversation click — check for stories first
-  const handleConversationClick = (convId: string) => {
+  // Handle photo click — open stories if available, otherwise open chat
+  const handlePhotoClick = (convId: string) => {
     const conv = conversations.find(c => c.id === convId);
     if (conv && storyUserIds.has(conv.participant.userId)) {
       setViewingStoryUserId(conv.participant.userId);
     } else {
       openChat(convId);
     }
+  };
+
+  // Handle conversation click (name/text area) — always open chat
+  const handleConversationClick = (convId: string) => {
+    openChat(convId);
   };
 
   // ─── If a chat is open, show full ChatScreen ───
@@ -118,6 +123,8 @@ export default function MessagesScreen() {
           customNicknames={customNicknames}
           isLight={isLight}
           onOpenChat={openChat}
+          onViewStory={(userId) => setViewingStoryUserId(userId)}
+          storyUserIds={storyUserIds}
         />
 
         {/* New Matches */}
@@ -128,10 +135,19 @@ export default function MessagesScreen() {
               {newMatches.map(match => {
                 const conv = conversations.find(c => c.participant.id === match.profile.id);
                 const hasStory = storyUserIds.has(match.profile.userId);
+                const handleMatchClick = () => {
+                  if (hasStory && conv) {
+                    setViewingStoryUserId(match.profile.userId);
+                  } else if (conv) {
+                    openChat(conv.id);
+                  } else {
+                    openChat(match.id);
+                  }
+                };
                 return (
                   <button
                     key={match.id}
-                    onClick={() => conv ? handleConversationClick(conv.id) : openChat(match.id)}
+                    onClick={handleMatchClick}
                     className="flex flex-col items-center gap-1.5 flex-shrink-0 cursor-pointer"
                   >
                     <div
@@ -182,8 +198,14 @@ export default function MessagesScreen() {
                   onKeyDown={(e) => { if (e.key === 'Enter') handleConversationClick(conv.id); }}
                   className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer"
                 >
-                  {/* Avatar with online dot + story ring */}
-                  <div className="relative flex-shrink-0">
+                  {/* Avatar with online dot + story ring — separate click handler */}
+                  <div
+                    className="relative flex-shrink-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePhotoClick(conv.id);
+                    }}
+                  >
                     {hasStory ? (
                       <div
                         className="w-[52px] h-[52px] rounded-full p-[2px]"

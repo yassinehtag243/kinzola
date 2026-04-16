@@ -56,6 +56,7 @@ export function useBrowserNotifications() {
             tag: 'kinzola-' + Date.now(),
             renotify: true,
             requireInteraction: true,
+            silent: true,
             ...options,
           });
         }).catch(() => {
@@ -65,6 +66,7 @@ export function useBrowserNotifications() {
             vibrate: [200, 100, 200],
             tag: 'kinzola-' + Date.now(),
             renotify: true,
+            silent: true,
             ...options,
           });
           setTimeout(() => { notif.close(); }, 5000);
@@ -76,6 +78,7 @@ export function useBrowserNotifications() {
           vibrate: [200, 100, 200],
           tag: 'kinzola-' + Date.now(),
           renotify: true,
+          silent: true,
           ...options,
         });
         setTimeout(() => { notif.close(); }, 5000);
@@ -134,6 +137,7 @@ export function showMessageNotification(
           tag: `kinzola-msg-${conversationId}-${Date.now()}`,
           renotify: true,
           requireInteraction: true,
+          silent: true,
           data: { conversationId, participantName },
           actions: [
             { action: 'reply', title: 'Répondre' },
@@ -143,11 +147,11 @@ export function showMessageNotification(
         });
       }).catch(() => {
         // Fallback
-        const notif = new Notification(title, { body, icon: icon || '/favicon.ico' });
+        const notif = new Notification(title, { body, icon: icon || '/favicon.ico', silent: true });
         setTimeout(() => { notif.close(); }, 5000);
       });
     } else {
-      const notif = new Notification(title, { body, icon: icon || '/favicon.ico' });
+      const notif = new Notification(title, { body, icon: icon || '/favicon.ico', silent: true });
       setTimeout(() => { notif.close(); }, 5000);
     }
   } catch {

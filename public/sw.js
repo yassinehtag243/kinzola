@@ -61,6 +61,7 @@ self.addEventListener('push', (event) => {
         renotify: true,
         vibrate: [200, 100, 200],
         requireInteraction: true,
+        silent: true,
         data: { conversationId, participantName },
         actions: [
           { action: 'reply', title: 'Répondre' },
@@ -77,6 +78,7 @@ self.addEventListener('push', (event) => {
         body: body || 'Nouveau message',
         icon: '/favicon.ico',
         vibrate: [200, 100, 200],
+        silent: true,
       })
     );
   }
