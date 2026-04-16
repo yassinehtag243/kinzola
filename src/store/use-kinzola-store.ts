@@ -179,6 +179,7 @@ interface KinzolaState {
   showChatContactDetail: boolean;
   customNicknames: Record<string, string>; // conversationId -> custom name
   blockedUserIds: string[];
+  mutedConversationIds: string[];
   reports: Array<{ id: string; targetUserId: string; reason: string; createdAt: string }>;
 
   // Actions - Navigation
@@ -246,6 +247,9 @@ interface KinzolaState {
   setCustomNickname: (conversationId: string, nickname: string) => void;
   blockUser: (userId: string) => void;
   unblockUser: (userId: string) => void;
+  muteConversation: (conversationId: string) => void;
+  unmuteConversation: (conversationId: string) => void;
+  markConversationRead: (conversationId: string) => void;
   reportUser: (targetUserId: string, reason: string) => void;
   markAllNotificationsRead: () => void;
   markNotificationRead: (notifId: string) => void;
@@ -307,6 +311,7 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
   showChatContactDetail: false,
   customNicknames: {},
   blockedUserIds: [],
+  mutedConversationIds: [],
   reports: [],
   superLikesRemaining: 5,
   totalLikesReceived: 24,
@@ -1066,6 +1071,22 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
   unblockUser: (userId) => {
     const { blockedUserIds } = get();
     set({ blockedUserIds: blockedUserIds.filter(id => id !== userId) });
+  },
+  muteConversation: (conversationId) => {
+    const { mutedConversationIds } = get();
+    if (!mutedConversationIds.includes(conversationId)) {
+      set({ mutedConversationIds: [...mutedConversationIds, conversationId] });
+    }
+  },
+  unmuteConversation: (conversationId) => {
+    const { mutedConversationIds } = get();
+    set({ mutedConversationIds: mutedConversationIds.filter(id => id !== conversationId) });
+  },
+  markConversationRead: (conversationId) => {
+    const updatedConvs = get().conversations.map(c =>
+      c.id === conversationId ? { ...c, unreadCount: 0 } : c
+    );
+    set({ conversations: updatedConvs });
   },
   reportUser: (targetUserId, reason) => {
     const { reports } = get();

@@ -19,6 +19,7 @@ import MatchModal from './messages/match-modal';
 import SplashScreen from './splash-screen';
 import NotificationSoundManager from './news/notification-sound-manager';
 import MatchNotificationBanner from './match-notification-banner';
+import MessageNotificationBanner from './messages/message-notification-banner';
 import { useBrowserNotifications } from '@/hooks/use-browser-notifications';
 
 // ─── Screen slide transition (left/right like mobile navigation) ───
@@ -117,6 +118,9 @@ export default function AppShell() {
 
       {/* ─── Match Notification Banner (in-app toast en haut) ─── */}
       <MatchNotificationBanner />
+
+      {/* ─── Message Notification Banner (WhatsApp-style) ─── */}
+      <MessageNotificationBanner />
 
       <AnimatePresence mode="wait">
         {currentScreen === 'welcome' && (
