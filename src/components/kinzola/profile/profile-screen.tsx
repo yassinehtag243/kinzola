@@ -6,6 +6,7 @@ import {
   Heart, Eye, Settings, Edit3, CheckCircle2, MapPin,
   Briefcase, Plus, X, ChevronDown, ChevronUp, Camera,
   Sparkles, Users, ArrowLeft, MessageCircle, Star,
+  Phone, Mail, GraduationCap, Ruler, Globe, Search, HeartPulse, Palette,
 } from 'lucide-react';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
 import { VerifiedBadgeStatic } from '@/components/kinzola/shared/verified-badge';
@@ -419,6 +420,9 @@ export default function ProfileScreen() {
                 <VerifiedBadgeStatic size="sm" />
               )}
             </div>
+            {user.pseudo && (
+              <p className="text-xs text-kinzola-muted/70 mb-0.5">@{user.pseudo}</p>
+            )}
             <span className="flex items-center gap-1 text-sm text-kinzola-muted">
               <MapPin className="w-3.5 h-3.5" />
               {user.city}
@@ -440,13 +444,114 @@ export default function ProfileScreen() {
       </motion.div>
 
       {/* ══════════════════════════════════════════
-          3. BIO SECTION
+          3. INFO CARDS SECTION
+          ══════════════════════════════════════════ */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.2 }}
+        className="px-5 mt-4"
+      >
+        <div className="grid grid-cols-2 gap-2">
+          {user.lookingFor && (
+            <div className="glass-card p-3 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(255, 77, 141, 0.12)' }}>
+                <Search className="w-4 h-4" style={{ color: '#FF4D8D' }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[9px] text-kinzola-muted uppercase tracking-wider">Je cherche</p>
+                <p className="text-xs font-semibold truncate" style={{ color: 'rgba(255,255,255,0.9)' }}>{user.lookingFor}</p>
+              </div>
+            </div>
+          )}
+          {user.height && (
+            <div className="glass-card p-3 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(43, 127, 255, 0.12)' }}>
+                <Ruler className="w-4 h-4" style={{ color: '#2B7FFF' }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[9px] text-kinzola-muted uppercase tracking-wider">Taille</p>
+                <p className="text-xs font-semibold" style={{ color: 'rgba(255,255,255,0.9)' }}>{user.height} cm</p>
+              </div>
+            </div>
+          )}
+          {user.education && (
+            <div className="glass-card p-3 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(168, 85, 247, 0.12)' }}>
+                <GraduationCap className="w-4 h-4" style={{ color: '#a855f7' }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[9px] text-kinzola-muted uppercase tracking-wider">Études</p>
+                <p className="text-xs font-semibold truncate" style={{ color: 'rgba(255,255,255,0.9)' }}>{user.education}</p>
+              </div>
+            </div>
+          )}
+          {user.languages && user.languages.length > 0 && (
+            <div className="glass-card p-3 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(74, 222, 128, 0.12)' }}>
+                <Globe className="w-4 h-4" style={{ color: '#4ade80' }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[9px] text-kinzola-muted uppercase tracking-wider">Langues</p>
+                <p className="text-xs font-semibold truncate" style={{ color: 'rgba(255,255,255,0.9)' }}>{user.languages.join(', ')}</p>
+              </div>
+            </div>
+          )}
+          {user.phone && (
+            <div className="glass-card p-3 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(43, 127, 255, 0.12)' }}>
+                <Phone className="w-4 h-4" style={{ color: '#2B7FFF' }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[9px] text-kinzola-muted uppercase tracking-wider">Téléphone</p>
+                <p className="text-xs font-semibold truncate" style={{ color: 'rgba(255,255,255,0.9)' }}>{user.phone}</p>
+              </div>
+            </div>
+          )}
+          {user.email && (
+            <div className="glass-card p-3 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(255, 77, 141, 0.12)' }}>
+                <Mail className="w-4 h-4" style={{ color: '#FF4D8D' }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[9px] text-kinzola-muted uppercase tracking-wider">Email</p>
+                <p className="text-xs font-semibold truncate" style={{ color: 'rgba(255,255,255,0.9)' }}>{user.email}</p>
+              </div>
+            </div>
+          )}
+          {user.relationshipStatus && (
+            <div className="glass-card p-3 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(255, 77, 141, 0.12)' }}>
+                <HeartPulse className="w-4 h-4" style={{ color: '#FF4D8D' }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[9px] text-kinzola-muted uppercase tracking-wider">Situation</p>
+                <p className="text-xs font-semibold truncate" style={{ color: 'rgba(255,255,255,0.9)' }}>{user.relationshipStatus}</p>
+              </div>
+            </div>
+          )}
+          {user.lifestyle && (
+            <div className="glass-card p-3 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(168, 85, 247, 0.12)' }}>
+                <Palette className="w-4 h-4" style={{ color: '#a855f7' }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[9px] text-kinzola-muted uppercase tracking-wider">Style de vie</p>
+                <p className="text-xs font-semibold truncate" style={{ color: 'rgba(255,255,255,0.9)' }}>{user.lifestyle}</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </motion.div>
+
+      {/* ══════════════════════════════════════════
+          3.5 BIO SECTION
           ══════════════════════════════════════════ */}
       {user.bio && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
+          transition={{ delay: 0.25 }}
           className="px-5 mt-4"
         >
           <BioSection bio={user.bio} />

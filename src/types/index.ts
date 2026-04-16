@@ -21,6 +21,12 @@ export interface User {
     gender: 'homme' | 'femme' | 'tous';
     religion: string;
   };
+  lookingFor?: string;
+  height?: number;
+  education?: string;
+  languages?: string[];
+  relationshipStatus?: string;
+  lifestyle?: string;
   createdAt: string;
   online: boolean;
   lastSeen: string;

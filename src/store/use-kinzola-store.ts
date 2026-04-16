@@ -812,6 +812,21 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
           audio.play().catch(() => {});
         } catch {}
 
+        // Direct browser notification for random incoming message
+        try {
+          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+            const notif = new Notification(`💬 ${randomConv.participant.name}`, {
+              body: content,
+              icon: '/favicon.ico',
+              tag: `kinzola-msg-${Date.now()}`,
+              renotify: true,
+              vibrate: [200, 100, 200],
+            });
+            notif.onclick = () => { window.focus(); notif.close(); };
+            setTimeout(() => notif.close(), 5000);
+          }
+        } catch {}
+
         // Schedule next random message
         scheduleNext();
       }, delay);

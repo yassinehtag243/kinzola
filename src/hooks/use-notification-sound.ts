@@ -22,6 +22,8 @@ export function getSoundType(notifType: string): NotificationSoundType {
       return 'match';
     case 'like':
       return 'like';
+    case 'message':
+      return 'message';
     case 'comment_mention':
     case 'mention':
       return 'message';

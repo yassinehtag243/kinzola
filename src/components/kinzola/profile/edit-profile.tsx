@@ -19,8 +19,12 @@ export default function EditProfile() {
     religion: user?.religion || '',
     bio: user?.bio || '',
     interests: user?.interests || [] as string[],
-    lookingFor: (user as any)?.lookingFor || 'relation sérieuse',
-    height: (user as any)?.height?.toString() || '',
+    lookingFor: user?.lookingFor || 'relation sérieuse',
+    height: user?.height?.toString() || '',
+    education: user?.education || '',
+    languages: user?.languages || [] as string[],
+    relationshipStatus: user?.relationshipStatus || 'Célibataire',
+    lifestyle: user?.lifestyle || '',
   });
 
   // Local gallery state (synced with user.photoGallery)
@@ -41,6 +45,17 @@ export default function EditProfile() {
         : prev.interests.length < 8
           ? [...prev.interests, interest]
           : prev.interests,
+    }));
+  };
+
+  const toggleLanguage = (lang: string) => {
+    setForm(prev => ({
+      ...prev,
+      languages: prev.languages.includes(lang)
+        ? prev.languages.filter(l => l !== lang)
+        : prev.languages.length < 5
+          ? [...prev.languages, lang]
+          : prev.languages,
     }));
   };
 
@@ -95,7 +110,11 @@ export default function EditProfile() {
       photoGallery: localGallery,
       lookingFor: form.lookingFor,
       height: parseInt(form.height) || undefined,
-    } as any);
+      education: form.education,
+      languages: form.languages,
+      relationshipStatus: form.relationshipStatus,
+      lifestyle: form.lifestyle,
+    });
     setShowEditProfile(false);
   };
 
@@ -335,6 +354,17 @@ export default function EditProfile() {
             </select>
           </div>
 
+          <div>
+            <label className="text-[11px] text-kinzola-muted mb-1 block">Études / Formation</label>
+            <input
+              type="text"
+              value={form.education}
+              onChange={(e) => updateForm('education', e.target.value)}
+              className={inputClass}
+              placeholder="Ex: Licence en Informatique"
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-[11px] text-kinzola-muted mb-1 block">Taille (cm)</label>
@@ -347,6 +377,37 @@ export default function EditProfile() {
               />
             </div>
             <div>
+              <label className="text-[11px] text-kinzola-muted mb-1 block">Situation amoureuse</label>
+              <select
+                value={form.relationshipStatus}
+                onChange={(e) => updateForm('relationshipStatus', e.target.value)}
+                className="w-full h-12 px-4 rounded-xl glass bg-white/5 text-white text-sm focus:outline-none transition-all appearance-none"
+              >
+                <option value="Célibataire" className="bg-kinzola-deep">Célibataire</option>
+                <option value="Célibataire et prêt(e)" className="bg-kinzola-deep">Prêt(e) à engager</option>
+                <option value="Divorcé(e)" className="bg-kinzola-deep">Divorcé(e)</option>
+                <option value="Séparé(e)" className="bg-kinzola-deep">Séparé(e)</option>
+                <option value="Veuf(ve)" className="bg-kinzola-deep">Veuf(ve)</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[11px] text-kinzola-muted mb-1 block">Style de vie</label>
+            <select
+              value={form.lifestyle}
+              onChange={(e) => updateForm('lifestyle', e.target.value)}
+              className="w-full h-12 px-4 rounded-xl glass bg-white/5 text-white text-sm focus:outline-none transition-all appearance-none"
+            >
+              <option value="" className="bg-kinzola-deep">Non spécifié</option>
+              {['Sportif(ve)', 'Casanier(ère)', 'Aventureux(se)', 'Bourlingueur(se)', 'Artistique', 'Intellectuel(le)', 'Ambitieux(se)', 'Zen / Calme'].map(l => (
+                <option key={l} value={l} className="bg-kinzola-deep">{l}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
               <label className="text-[11px] text-kinzola-muted mb-1 block">Je cherche</label>
               <select
                 value={form.lookingFor}
@@ -358,6 +419,29 @@ export default function EditProfile() {
                 <option value="discussion" className="bg-kinzola-deep">Discussion</option>
                 <option value="rien de spécial" className="bg-kinzola-deep">Rien de spécial</option>
               </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[11px] text-kinzola-muted mb-2 block">Langues ({form.languages.length}/5)</label>
+            <div className="flex flex-wrap gap-2">
+              {['Français', 'Lingala', 'Anglais', 'Swahili', 'Kikongo', 'Tshiluba', 'Espagnol', 'Portugais'].map(lang => (
+                <button
+                  key={lang}
+                  onClick={() => toggleLanguage(lang)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-300 ${
+                    form.languages.includes(lang)
+                      ? 'text-white'
+                      : 'glass text-kinzola-muted hover:text-white'
+                  }`}
+                  style={form.languages.includes(lang) ? {
+                    background: 'linear-gradient(135deg, #4ade80, #22c55e)',
+                    boxShadow: '0 0 10px rgba(74, 222, 128, 0.3)',
+                  } : {}}
+                >
+                  {lang}
+                </button>
+              ))}
             </div>
           </div>
 

@@ -54,7 +54,12 @@ export default function MessagesScreen() {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="p-5 pb-3 flex-shrink-0">
-        <h2 className="text-2xl font-bold mb-3">Discussions</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-2xl font-bold">Discussions</h2>
+          <span className="text-[11px] text-kinzola-muted flex items-center gap-1">
+            {filteredConversations.length} conversation{filteredConversations.length > 1 ? 's' : ''}
+          </span>
+        </div>
         <div className="relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-kinzola-muted" />
           <input
@@ -142,22 +147,21 @@ export default function MessagesScreen() {
                 onKeyDown={(e) => { if (e.key === 'Enter') openChat(conv.id); }}
                 className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer"
               >
-                {/* Avatar */}
+                {/* Avatar with online dot */}
                 <div className="relative flex-shrink-0">
                   <img
                     src={conv.participant.photoUrl}
                     alt={conv.participant.name}
                     className="w-[52px] h-[52px] rounded-full object-cover"
+                    style={{ border: conv.online ? '2px solid rgba(74, 222, 128, 0.4)' : '2px solid rgba(255,255,255,0.08)' }}
                   />
                   {conv.online ? (
-                    <motion.div
-                      className="absolute -bottom-0.5 -right-0.5 w-[18px] h-[18px] rounded-full flex items-center justify-center"
-                      style={{ background: bgColor }}
-                      animate={{ scale: [1, 1.15, 1] }}
-                      transition={{ type: 'tween', duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-                    >
-                      <span className="text-[12px] leading-none" style={{ filter: 'drop-shadow(0 0 6px rgba(255, 45, 111, 0.8))' }}>❤️</span>
-                    </motion.div>
+                    <div
+                      className="absolute -bottom-0.5 -right-0.5 w-[14px] h-[14px] rounded-full bg-green-400"
+                      style={{
+                        boxShadow: '0 0 0 2.5px ' + bgColor + ', 0 0 6px rgba(74, 222, 128, 0.5)',
+                      }}
+                    />
                   ) : (
                     <div
                       className="absolute -bottom-0.5 -right-0.5 w-[14px] h-[14px] rounded-full"
@@ -172,41 +176,45 @@ export default function MessagesScreen() {
                 {/* Info */}
                 <div className="flex-1 min-w-0 text-left">
                   <div className="flex items-center justify-between mb-0.5">
-                    <h4 className="text-sm font-bold truncate">{customNicknames[conv.id] || conv.participant.name}</h4>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <h4 className="text-sm font-bold truncate">{customNicknames[conv.id] || conv.participant.name}</h4>
+                      {conv.online && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0"
+                          style={{ background: 'rgba(74, 222, 128, 0.12)', color: '#4ade80' }}>
+                          En ligne
+                        </span>
+                      )}
+                    </div>
                     <span className="text-[11px] text-kinzola-muted flex-shrink-0 ml-2">
                       {conv.lastMessageTime}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0 pr-2">
-                      {conv.online ? (
-                        <span className="flex items-center gap-1 text-[12px]" style={{ color: '#FF2D6F' }}>
-                          <span style={{ filter: 'drop-shadow(0 0 4px rgba(255, 45, 111, 0.7))' }}>❤️</span>
-                          <span className="font-semibold" style={{ textShadow: '0 0 8px rgba(255, 45, 111, 0.5)' }}>En ligne</span>
-                        </span>
-                      ) : (
-                        <p className="text-[12px] text-kinzola-muted truncate">
-                          {conv.lastMessage}
-                        </p>
-                      )}
+                      <p className="text-[12px] text-kinzola-muted truncate">
+                        {conv.lastMessage}
+                      </p>
                       {!conv.online && (
-                        <span className="block text-[10px] text-kinzola-muted/60">
+                        <span className="block text-[10px] text-kinzola-muted/50 mt-0.5">
                           Vu {formatLastSeen(conv.lastSeen, clientNow)}
                         </span>
                       )}
                     </div>
                     {conv.unreadCount > 0 && (
-                      <span
+                      <motion.span
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
                         className="min-w-[20px] h-5 rounded-full flex items-center justify-center px-1.5 flex-shrink-0"
                         style={{
                           background: 'linear-gradient(135deg, #2B7FFF, #FF4D8D)',
                           fontSize: '10px',
                           fontWeight: 700,
                           color: 'white',
+                          boxShadow: '0 2px 8px rgba(43, 127, 255, 0.3)',
                         }}
                       >
                         {conv.unreadCount}
-                      </span>
+                      </motion.span>
                     )}
                   </div>
                 </div>
