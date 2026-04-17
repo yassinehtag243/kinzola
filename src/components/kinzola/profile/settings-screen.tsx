@@ -1765,8 +1765,16 @@ export default function SettingsScreen() {
         >
           <motion.button
             whileTap={{ scale: 0.97 }}
-            onClick={logout}
-            className="w-full h-12 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2.5 cursor-pointer transition-all duration-300"
+            onClick={async () => {
+              try {
+                await logout();
+                showToast('Déconnexion réussie', 'success');
+              } catch {
+                showToast('Erreur lors de la déconnexion', 'error');
+              }
+            }}
+            disabled={false}
+            className="w-full h-12 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2.5 cursor-pointer transition-all duration-300 disabled:opacity-50"
             style={{
               background: 'linear-gradient(135deg, #EF4444, #DC2626)',
               color: '#FFFFFF',

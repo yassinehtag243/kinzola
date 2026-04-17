@@ -177,7 +177,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null);
     setSession(null);
     // Nettoyer le store Zustand
-    const store = useKinzolaStore.getState();
     useKinzolaStore.setState({
       user: null,
       isAuthenticated: false,
@@ -193,6 +192,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       likesReceived: [],
       profileVisitors: [],
       blockedUserIds: [],
+      showSettings: false,
+      showEditPersonalInfo: false,
+      showEditProfile: false,
     });
   }, []);
 

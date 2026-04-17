@@ -144,18 +144,23 @@ export async function login(email: string, password: string): Promise<AuthResult
 // ─── Logout ────────────────────────────────────────────────────────────────
 
 export async function logout(): Promise<AuthError | null> {
-  // Mark offline before signing out
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Marquer hors ligne avant de se déconnecter (non-bloquant)
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  if (user) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase.from('profiles') as any)
-      .update({ online: false, last_seen: new Date().toISOString() })
-      .eq('id', user.id);
+    if (user) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase.from('profiles') as any)
+        .update({ online: false, last_seen: new Date().toISOString() })
+        .eq('id', user.id);
+    }
+  } catch {
+    // Si la mise à jour du profil échoue (RLS, réseau...), on continue quand même
   }
 
+  // TOUJOURS appeler signOut(), même si la mise à jour a échoué
   const { error } = await supabase.auth.signOut();
   return error;
 }

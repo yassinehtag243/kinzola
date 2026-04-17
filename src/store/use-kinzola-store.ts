@@ -521,6 +521,9 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
       blockedUserIds: [],
       loading: false,
       error: null,
+      showSettings: false,
+      showEditPersonalInfo: false,
+      showEditProfile: false,
     });
   },
 
