@@ -33,9 +33,9 @@ export function usePwaInstall() {
     const wasDismissed = localStorage.getItem('kinzola-pwa-dismissed');
     const dismissedAt = wasDismissed ? parseInt(wasDismissed, 10) : 0;
     // Ne pas montrer le banner pendant 7 jours après dismissal
+    // MAIS si l'app a été désinstallée, réinitialiser le dismiss
     if (dismissedAt && Date.now() - dismissedAt < 7 * 24 * 60 * 60 * 1000) {
       setDismissed(true);
-      return;
     }
 
     // Capturer le beforeinstallprompt

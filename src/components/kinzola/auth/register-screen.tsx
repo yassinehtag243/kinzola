@@ -10,6 +10,7 @@ import { useKinzolaStore } from '@/store/use-kinzola-store';
 import { useAuth } from '@/lib/supabase/auth-context';
 import { AVAILABLE_RELIGIONS } from '@/lib/constants';
 import CityInput from '@/components/kinzola/shared/city-input';
+import { updateProfilePhoto } from '@/lib/supabase/storage-service';
 
 type RegisterMethod = 'phone' | 'email';
 
@@ -289,14 +290,26 @@ export default function RegisterScreen() {
           console.error('[REGISTER] Supabase error:', result.error);
           if (msg.includes('already registered') || msg.includes('already in use') || msg.includes('Unique')) {
             setRegisterError('Cette adresse e-mail est déjà utilisée');
+          } else if (msg.includes('Password') || msg.includes('password')) {
+            setRegisterError('Le mot de passe ne respecte pas les critères (min. 6 caractères)');
           } else {
-            // Afficher le message exact pour debug
-            setRegisterError('Erreur: ' + msg);
+            setRegisterError('Erreur lors de l\'inscription. Veuillez réessayer.');
           }
           setRegistering(false);
           return;
         }
         // On success, AuthProvider + AppShell sync will handle Zustand update and navigation
+        // Upload profile photo if selected (non-blocking)
+        if (result.user && form.profilePhoto) {
+          try {
+            const res = await fetch(form.profilePhoto);
+            const blob = await res.blob();
+            const file = new File([blob], 'profile.jpg', { type: 'image/jpeg' });
+            await updateProfilePhoto(result.user.id, file);
+          } catch (photoErr) {
+            console.warn('[REGISTER] Photo upload failed (non-blocking):', photoErr);
+          }
+        }
       } else {
         // Phone registration — generate email from phone
         const cleanPhone = form.phone.replace(/[^\d+]/g, '');
@@ -319,19 +332,30 @@ export default function RegisterScreen() {
           console.error('[REGISTER] Supabase error:', result.error);
           if (msg.includes('already registered') || msg.includes('already in use') || msg.includes('Unique')) {
             setRegisterError('Ce numéro de téléphone est déjà utilisé');
+          } else if (msg.includes('Password') || msg.includes('password')) {
+            setRegisterError('Erreur de sécurité. Veuillez réessayer.');
           } else {
-            // Afficher le message exact pour debug
-            setRegisterError('Erreur: ' + msg);
+            setRegisterError('Erreur lors de l\'inscription. Veuillez réessayer.');
           }
           setRegistering(false);
           return;
         }
         // On success, AuthProvider + AppShell sync will handle Zustand update and navigation
+        // Upload profile photo if selected (non-blocking)
+        if (result.user && form.profilePhoto) {
+          try {
+            const res = await fetch(form.profilePhoto);
+            const blob = await res.blob();
+            const file = new File([blob], 'profile.jpg', { type: 'image/jpeg' });
+            await updateProfilePhoto(result.user.id, file);
+          } catch (photoErr) {
+            console.warn('[REGISTER] Photo upload failed (non-blocking):', photoErr);
+          }
+        }
       }
     } catch (err) {
       console.error('[REGISTER] Unexpected error:', err);
-      const errMsg = err instanceof Error ? err.message : String(err);
-      setRegisterError(`Erreur: ${errMsg}`);
+      setRegisterError('Une erreur inattendue est survenue. Veuillez réessayer.');
     } finally {
       setRegistering(false);
     }
