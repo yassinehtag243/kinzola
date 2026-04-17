@@ -21,6 +21,7 @@ import SplashScreen from './splash-screen';
 import NotificationSoundManager from './news/notification-sound-manager';
 import MatchNotificationBanner from './match-notification-banner';
 import MessageNotificationBanner from './messages/message-notification-banner';
+import PwaInstallBanner from './shared/pwa-install-banner';
 import { useBrowserNotifications } from '@/hooks/use-browser-notifications';
 import { useRealtime } from '@/hooks/use-realtime';
 
@@ -249,6 +250,9 @@ export default function AppShell() {
 
       {/* ─── Message Notification Banner (WhatsApp-style) ─── */}
       <MessageNotificationBanner />
+
+      {/* ─── PWA Install Banner (Android Chrome) ─── */}
+      <PwaInstallBanner />
 
       <AnimatePresence mode="wait">
         {currentScreen === 'welcome' && (

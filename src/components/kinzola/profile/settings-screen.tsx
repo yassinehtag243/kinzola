@@ -13,7 +13,9 @@ import {
   Loader2, Clock, CheckCircle2, XCircle,
   Volume2, Play, Star as StarFilled, Heart as HeartFilled,
   MessageCircle as MessageFilled, Award as AwardFilled,
+  Download,
 } from 'lucide-react';
+import { usePwaInstall } from '@/hooks/use-pwa-install';
 import VerifiedBadge, { VerifiedBadgeStatic } from '@/components/kinzola/shared/verified-badge';
 import HelpCenterScreen from './help-center-screen';
 import ReportProblemScreen from './report-problem-screen';
@@ -1021,6 +1023,81 @@ function BadgeVerificationModal({ onClose, onToast }: { onClose: () => void; onT
 }
 
 // ═══════════════════════════════════════════════════════════════
+// ─── PWA INSTALL SETTINGS ITEM ───
+// ═══════════════════════════════════════════════════════════════
+function PwaInstallSettingsItem() {
+  const { isInstallable, isInstalled, install } = usePwaInstall();
+  const isLight = useKinzolaStore((s) => s.theme === 'light');
+
+  if (isInstalled) {
+    return (
+      <div className="flex items-center justify-between px-4 py-3.5">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(34, 197, 94, 0.15)' }}>
+            <Check className="w-4 h-4" style={{ color: '#22c55e' }} />
+          </div>
+          <div className="text-left min-w-0">
+            <span className={`text-sm block ${isLight ? 'text-gray-800' : 'text-white'}`}>Application installée</span>
+            <p className={`text-[11px] mt-0.5 truncate ${isLight ? 'text-gray-400' : 'text-kinzola-muted'}`}>Kinzola est installée sur votre appareil</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isInstallable) {
+    return (
+      <div className="flex items-center justify-between px-4 py-3.5">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(43, 127, 255, 0.15)' }}>
+            <Download className="w-4 h-4" style={{ color: '#2B7FFF' }} />
+          </div>
+          <div className="text-left min-w-0">
+            <span className={`text-sm block ${isLight ? 'text-gray-800' : 'text-white'}`}>Installer l'application</span>
+            <p className={`text-[11px] mt-0.5 truncate ${isLight ? 'text-gray-400' : 'text-kinzola-muted'}`}>
+              Ouvrez dans Chrome puis menu &gt; "Installer l'app"
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={install}
+      className="w-full flex items-center justify-between px-4 py-3.5 transition-colors duration-200 cursor-pointer hover:bg-white/5 active:bg-white/10"
+    >
+      <div className="flex items-center gap-3 min-w-0">
+        <motion.div
+          animate={{ scale: [1, 1.1, 1] }}
+          transition={{ type: 'tween', duration: 2, repeat: Infinity }}
+          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg, rgba(43, 127, 255, 0.2), rgba(255, 77, 141, 0.2))' }}
+        >
+          <Download className="w-4 h-4" style={{ color: '#2B7FFF' }} />
+        </motion.div>
+        <div className="text-left min-w-0">
+          <span className={`text-sm block font-medium ${isLight ? 'text-gray-800' : 'text-white'}`}>Installer l'application</span>
+          <p className={`text-[11px] mt-0.5 truncate ${isLight ? 'text-gray-400' : 'text-kinzola-muted'}`}>
+            Accès rapide depuis l'écran d'accueil
+          </p>
+        </div>
+      </div>
+      <div
+        className="text-white text-[11px] font-semibold px-3 py-1.5 rounded-xl"
+        style={{
+          background: 'linear-gradient(135deg, #2B7FFF, #1a5fd4)',
+          boxShadow: '0 0 15px rgba(43, 127, 255, 0.3)',
+        }}
+      >
+        Installer
+      </div>
+    </button>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // ─── MAIN SETTINGS SCREEN ───
 // ═══════════════════════════════════════════════════════════════
 export default function SettingsScreen() {
@@ -1593,6 +1670,8 @@ export default function SettingsScreen() {
             iconColor="#FF4D8D"
             onClick={() => handleSupportAction('Partager Kinzola')}
           />
+          <SectionDivider />
+          <PwaInstallSettingsItem />
         </SettingsSection>
 
         {/* ═══ About Panel ═══ */}
