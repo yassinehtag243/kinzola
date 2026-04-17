@@ -339,7 +339,7 @@ interface KinzolaState {
   setShowSettings: (show: boolean) => void;
   setShowEditPersonalInfo: (show: boolean) => void;
   setRegisterStep: (step: number) => void;
-  updateProfile: (data: Partial<User>) => void;
+  updateProfile: (data: Partial<User>) => Promise<{ success: boolean; error?: string }>;
 
   // Actions - Data
   fetchAllData: () => Promise<void>;
@@ -1244,23 +1244,28 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
   setShowEditPersonalInfo: (show) => set({ showEditPersonalInfo: show }),
   setRegisterStep: (step) => set({ registerStep: step }),
 
-  updateProfile: async (data) => {
+  updateProfile: async (data): Promise<{ success: boolean; error?: string }> => {
     const { user } = get();
-    if (!user) return;
+    if (!user) return { success: false, error: 'Utilisateur non connecté' };
 
     try {
       const dbUpdate = userProfileToDbUpdate(data);
+      console.log('[updateProfile] Envoi vers Supabase:', dbUpdate);
       const { profile: updated, error } = await supabaseUpdateProfile(user.id, dbUpdate as any);
       if (error) {
-        console.error('[updateProfile] Erreur:', error);
-        return;
+        console.error('[updateProfile] Erreur Supabase:', error);
+        return { success: false, error: error.message || 'Erreur lors de la mise à jour' };
       }
       if (updated) {
         const updatedUser = dbProfileToUser(updated, user.email);
         set({ user: updatedUser });
+        console.log('[updateProfile] Profil mis à jour avec succès');
+        return { success: true };
       }
-    } catch (err) {
-      console.error('[updateProfile] Erreur:', err);
+      return { success: false, error: 'Aucune réponse de la base de données' };
+    } catch (err: any) {
+      console.error('[updateProfile] Exception:', err);
+      return { success: false, error: err?.message || 'Erreur inconnue' };
     }
   },
 

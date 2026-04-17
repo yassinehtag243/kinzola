@@ -245,3 +245,25 @@ Stage Summary:
 - Registration works even with email confirmation enabled in Supabase settings
 - Better error messages in French instead of raw English error strings
 
+---
+Task ID: 1
+Agent: main
+Task: Fix logout button and profile data persistence
+
+Work Log:
+- Analyzed the logout flow: settings-screen → store.logout() → supabaseLogout() → signOut()
+- Analyzed the profile save flow: edit-personal-info → store.updateProfile() → supabaseUpdateProfile()
+- Found root cause #1: edit-personal-info.tsx had a fake setTimeout(1200) instead of real API call, and didn't await updateProfile
+- Found root cause #2: updateProfile in store silently caught errors, never returning failure info to callers
+- Found root cause #3: edit-profile.tsx sent fields (lookingFor, height, education, languages, etc.) that don't exist in DB columns
+- Fixed settings-screen.tsx: logout now shows toast before unmounting, forces page reload for clean state
+- Fixed edit-personal-info.tsx: removed fake setTimeout, added real password validation via supabase.auth.signInWithPassword(), awaits updateProfile result, shows errors
+- Fixed use-kinzola-store.ts: updateProfile now returns { success: boolean; error?: string } instead of void, with proper error propagation
+- Fixed edit-profile.tsx: checks profileResult.success, shows error if update fails, removed non-existent DB fields
+- Fixed adapter.ts: added online field mapping, added comment about non-existent DB fields
+- Fixed auth-service.ts: added photo_gallery and online to ProfileUpdate type
+
+Stage Summary:
+- Files modified: settings-screen.tsx, edit-personal-info.tsx, use-kinzola-store.ts, edit-profile.tsx, adapter.ts, auth-service.ts
+- Build passes: Next.js 16.1.3 build successful
+- Key behavior changes: logout forces page reload, profile edits show errors if Supabase update fails

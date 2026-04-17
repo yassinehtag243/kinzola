@@ -40,9 +40,11 @@ export type ProfileUpdate = Partial<{
   religion: string;
   bio: string;
   photo_url: string;
+  photo_gallery: string[];
   interests: string[];
   text_size: number;
   discover_intent: DiscoverIntent;
+  online: boolean;
 }>;
 
 export interface AuthResult {

@@ -241,5 +241,8 @@ export function userProfileToDbUpdate(data: Partial<User>): Record<string, unkno
   if (data.photoUrl !== undefined) update.photo_url = data.photoUrl;
   if (data.photoGallery !== undefined) update.photo_gallery = data.photoGallery;
   if (data.interests !== undefined) update.interests = data.interests;
+  if (data.online !== undefined) update.online = data.online;
+  // Note: lookingFor, height, education, languages, relationshipStatus, lifestyle
+  // ne sont PAS des colonnes dans la table profiles Supabase — ignorés ici
   return update;
 }

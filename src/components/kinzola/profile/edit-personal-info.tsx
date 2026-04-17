@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Lock, Check, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Lock, Check, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
+import { supabase } from '@/lib/supabase/client';
 
 export default function EditPersonalInfo() {
   const { user, updateProfile, setShowEditPersonalInfo } = useKinzolaStore();
@@ -15,27 +16,53 @@ export default function EditPersonalInfo() {
   const [showPassword, setShowPassword] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const isFormValid = firstName.trim() && lastName.trim() && pseudo.trim() && password.trim();
 
   const handleSave = async () => {
     if (!isFormValid) return;
+    setError('');
     setIsSaving(true);
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1200));
+    try {
+      // 1) Vérifier le mot de passe en se ré-authentifiant
+      const email = user?.email || '';
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password: password.trim(),
+      });
 
-    updateProfile({
-      name: `${firstName.trim()} ${lastName.trim()}`,
-      pseudo: pseudo.trim(),
-    });
+      if (authError) {
+        setError('Mot de passe incorrect. Veuillez réessayer.');
+        setIsSaving(false);
+        return;
+      }
 
-    setIsSaving(false);
-    setShowSuccess(true);
-    setTimeout(() => {
-      setShowSuccess(false);
-      setShowEditPersonalInfo(false);
-    }, 1500);
+      // 2) Mettre à jour le profil dans Supabase
+      const result = await updateProfile({
+        name: `${firstName.trim()} ${lastName.trim()}`,
+        pseudo: pseudo.trim(),
+      });
+
+      if (!result.success) {
+        setError(result.error || 'Erreur lors de la sauvegarde dans la base de données.');
+        setIsSaving(false);
+        return;
+      }
+
+      // 3) Succès
+      setIsSaving(false);
+      setShowSuccess(true);
+      setTimeout(() => {
+        setShowSuccess(false);
+        setShowEditPersonalInfo(false);
+      }, 1500);
+    } catch (err: any) {
+      console.error('[EditPersonalInfo] Erreur:', err);
+      setError(err?.message || 'Une erreur est survenue lors de la sauvegarde.');
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -257,23 +284,23 @@ export default function EditPersonalInfo() {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => { setPassword(e.target.value); setError(''); }}
                   placeholder="Entrez votre mot de passe"
                   className="w-full h-[52px] rounded-2xl pl-11 pr-11 text-white text-sm outline-none transition-all duration-300"
                   style={{
                     background: 'rgba(255, 255, 255, 0.04)',
-                    border: password ? '1px solid rgba(255, 77, 141, 0.4)' : '1px solid rgba(255, 255, 255, 0.08)',
-                    boxShadow: password ? '0 0 20px rgba(255, 77, 141, 0.1)' : 'none',
+                    border: error ? '1px solid rgba(239, 68, 68, 0.6)' : password ? '1px solid rgba(255, 77, 141, 0.4)' : '1px solid rgba(255, 255, 255, 0.08)',
+                    boxShadow: error ? '0 0 20px rgba(239, 68, 68, 0.1)' : password ? '0 0 20px rgba(255, 77, 141, 0.1)' : 'none',
                   }}
                   onFocus={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(255, 77, 141, 0.5)';
-                    e.currentTarget.style.boxShadow = '0 0 20px rgba(255, 77, 141, 0.15)';
+                    e.currentTarget.style.borderColor = error ? 'rgba(239, 68, 68, 0.6)' : 'rgba(255, 77, 141, 0.5)';
+                    e.currentTarget.style.boxShadow = error ? '0 0 20px rgba(239, 68, 68, 0.15)' : '0 0 20px rgba(255, 77, 141, 0.15)';
                   }}
                   onBlur={(e) => {
                     if (!password) {
                       e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
                       e.currentTarget.style.boxShadow = 'none';
-                    } else {
+                    } else if (!error) {
                       e.currentTarget.style.borderColor = 'rgba(255, 77, 141, 0.4)';
                       e.currentTarget.style.boxShadow = '0 0 20px rgba(255, 77, 141, 0.1)';
                     }
@@ -293,6 +320,19 @@ export default function EditPersonalInfo() {
               </div>
             </div>
           </div>
+
+          {/* Error message */}
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -5 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center gap-2 mt-4 px-4 py-3 rounded-xl"
+              style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+            >
+              <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
+              <span className="text-sm text-red-400">{error}</span>
+            </motion.div>
+          )}
 
           {/* Sauvegarder Button */}
           <motion.button

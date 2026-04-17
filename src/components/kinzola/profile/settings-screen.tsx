@@ -1767,10 +1767,19 @@ export default function SettingsScreen() {
             whileTap={{ scale: 0.97 }}
             onClick={async () => {
               try {
+                // D'abord afficher le toast AVANT que le composant ne se démonte
+                showToast('Déconnexion en cours...', 'info');
+                // Petit délai pour laisser le toast s'afficher
+                await new Promise(r => setTimeout(r, 400));
                 await logout();
-                showToast('Déconnexion réussie', 'success');
-              } catch {
+                // Forcer la réinitialisation complète
+                if (typeof window !== 'undefined') {
+                  localStorage.removeItem('kinzola-auth-session');
+                  window.location.href = '/';
+                }
+              } catch (err) {
                 showToast('Erreur lors de la déconnexion', 'error');
+                console.error('[Logout] Erreur:', err);
               }
             }}
             disabled={false}

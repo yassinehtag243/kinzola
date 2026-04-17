@@ -163,7 +163,7 @@ export default function EditProfile() {
       }
 
       // Update profile with storage URLs (not base64)
-      await updateProfile({
+      const profileResult = await updateProfile({
         name: form.name,
         pseudo: form.pseudo,
         age: parseInt(form.age) || user?.age || 25,
@@ -175,13 +175,13 @@ export default function EditProfile() {
         interests: form.interests,
         photoUrl: finalPhotoUrl,
         photoGallery: finalGallery,
-        lookingFor: form.lookingFor,
-        height: parseInt(form.height) || undefined,
-        education: form.education,
-        languages: form.languages,
-        relationshipStatus: form.relationshipStatus,
-        lifestyle: form.lifestyle,
       });
+
+      if (!profileResult.success) {
+        setUploadError(profileResult.error || 'Erreur lors de la sauvegarde du profil');
+        setSaving(false);
+        return;
+      }
 
       setPendingAvatarFile(null);
       setPendingGalleryFiles([]);
