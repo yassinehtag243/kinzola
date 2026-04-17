@@ -224,3 +224,24 @@ Stage Summary:
 - Vercel a jour avec env vars securisees
 - kinzola.vercel.app HTTP 200 + headers securite OK
 
+---
+Task ID: 11
+Agent: main
+Task: Fix "Failed to fetch" error during registration
+
+Work Log:
+- Identified root cause: Service Worker intercepting Supabase REST API calls (/rest/v1/profiles)
+- Identified secondary cause: RLS blocking profile INSERT when email confirmation is enabled (no active session)
+- Fixed sw.js: added supabase.co domain exclusion to shouldCache() (was only excluding /auth/v1/)
+- Created /src/app/api/auth/register/route.ts: server-side API route using supabaseAdmin (service_role) to bypass RLS
+- Updated auth-service.ts: replaced direct Supabase client upsert with fetch to /api/auth/register
+- Updated register-screen.tsx: improved error handling with specific French messages for all error types
+- Build passes: 0 errors, new /api/auth/register dynamic route detected
+- Committed as 4282b33, pushed to main, Vercel auto-deploying
+
+Stage Summary:
+- Service Worker no longer intercepts ANY Supabase API calls (auth, rest, storage, realtime all excluded)
+- Profile creation now happens server-side with service_role key (bypasses RLS completely)
+- Registration works even with email confirmation enabled in Supabase settings
+- Better error messages in French instead of raw English error strings
+
