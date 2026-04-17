@@ -163,7 +163,7 @@ export default function EditProfile() {
       }
 
       // Update profile with storage URLs (not base64)
-      updateProfile({
+      await updateProfile({
         name: form.name,
         pseudo: form.pseudo,
         age: parseInt(form.age) || user?.age || 25,

@@ -1047,7 +1047,16 @@ function PwaInstallSettingsItem() {
 
   if (!isInstallable) {
     return (
-      <div className="flex items-center justify-between px-4 py-3.5">
+      <button
+        onClick={() => {
+          // Guide vers l'installation manuelle
+          if (typeof window !== 'undefined' && 'getInstalledRelatedApps' in navigator) {
+            // Android Chrome: essayer l'API native
+            window.open('https://kinzola.vercel.app', '_blank');
+          }
+        }}
+        className="w-full flex items-center justify-between px-4 py-3.5 transition-colors duration-200 cursor-pointer hover:bg-white/5 active:bg-white/10"
+      >
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(43, 127, 255, 0.15)' }}>
             <Download className="w-4 h-4" style={{ color: '#2B7FFF' }} />
@@ -1055,11 +1064,19 @@ function PwaInstallSettingsItem() {
           <div className="text-left min-w-0">
             <span className={`text-sm block ${isLight ? 'text-gray-800' : 'text-white'}`}>Installer l'application</span>
             <p className={`text-[11px] mt-0.5 truncate ${isLight ? 'text-gray-400' : 'text-kinzola-muted'}`}>
-              Ouvrez dans Chrome puis menu &gt; "Installer l'app"
+              Ouvrez dans Chrome puis menu &gt; &quot;Installer l&apos;application&quot; ou &quot;Ajouter à l&apos;écran d&apos;accueil&quot;
             </p>
           </div>
         </div>
-      </div>
+        <div
+          className="text-white text-[11px] font-semibold px-3 py-1.5 rounded-xl"
+          style={{
+            background: 'linear-gradient(135deg, #2B7FFF, #1a5fd4)',
+          }}
+        >
+          Guide
+        </div>
+      </button>
     );
   }
 
