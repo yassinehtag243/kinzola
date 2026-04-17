@@ -95,3 +95,39 @@ Stage Summary:
 - Zero lint errors in modified files (15 pre-existing warnings in other files)
 - Store interface preserved — all 35 existing components continue to work
 - Actions that were sync are now async (return Promise) — components still work via re-renders
+
+---
+Task ID: 6
+Agent: main
+Task: Phase 4 - Photo upload via Supabase Storage
+
+Work Log:
+- Modified `edit-profile.tsx`:
+  - Imported `updateProfilePhoto` and `uploadGalleryPhoto` from storage-service
+  - Added pending file tracking: `pendingAvatarFile`, `pendingGalleryFiles`, `avatarPreview`
+  - `handleAvatarChange`: stores File object + FileReader for instant preview
+  - `handleGalleryFileChange`: stores File objects + FileReader for instant preview
+  - `handleSave`: async — uploads avatar via `updateProfilePhoto()`, gallery via `uploadGalleryPhoto()`, keeps existing HTTP URLs, builds final update with storage URLs
+  - Added loading states: `saving`, `uploadError` toast, Loader2 spinner on avatar/gallery during upload
+- Modified `chat-input-bar.tsx`:
+  - Added `conversationId: string` prop to `ChatInputBarProps`
+  - Imported `uploadMessageImage` and `uploadMessageAudio` from storage-service
+  - `handleConfirmSendImage`: uploads to Supabase Storage via `uploadMessageImage()` before calling `onSendImage(url)`
+  - `stopAndSend` (voice): uploads audio blob via `uploadMessageAudio()`, sends `duration|storageUrl`
+  - Added `uploadingImage` state with Loader2 spinner
+  - Fallback to base64 if storage upload fails
+- Modified `chat-screen.tsx`:
+  - Passes `conversationId={conversationId}` prop to `<ChatInputBar>`
+- Modified `create-post.tsx`:
+  - Imported `uploadPostImage` from storage-service
+  - Added `pendingImageFile` state
+  - `handlePublish`: uploads image to Supabase Storage before creating post
+  - Added upload progress overlay and error handling
+
+Stage Summary:
+- 4 files modified, 319 insertions, 81 deletions
+- Build passes: 0 errors
+- Committed as 8f7348b, pushed to main
+- All image/audio uploads now go through Supabase Storage (kinzola-photos bucket)
+- Instant local preview preserved (FileReader), actual upload on save/send
+- Graceful fallback to base64 if storage upload fails
