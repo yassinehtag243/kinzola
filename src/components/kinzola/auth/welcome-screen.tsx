@@ -102,11 +102,11 @@ export default function WelcomeScreen() {
               filter: 'blur(30px)',
             }}
           />
-          <div className="relative w-36 h-36">
+          <div className="relative w-36 h-36 rounded-full overflow-hidden">
             <img
-              src="/kinzola-logo.png"
+              src="/icon-512.png"
               alt="Kinzola"
-              className="w-full h-full object-contain"
+              className="w-full h-full object-cover"
             />
           </div>
         </motion.div>
