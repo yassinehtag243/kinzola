@@ -36,58 +36,9 @@ export default function WelcomeScreen() {
   }, []);
 
   return (
-    <div className="relative w-full h-[100dvh] flex flex-col items-center justify-center overflow-hidden bg-kinzola-bg">
-      {/* Animated Mesh Gradient Background */}
-      <div className="absolute inset-0 overflow-hidden">
-        {/* Primary blue blob */}
-        <div
-          className="absolute w-[500px] h-[500px] rounded-full opacity-30"
-          style={{
-            top: '10%',
-            left: '-10%',
-            background: 'radial-gradient(circle, #2B7FFF 0%, transparent 70%)',
-            filter: 'blur(80px)',
-            animation: 'mesh-float-1 12s ease-in-out infinite',
-          }}
-        />
-        {/* Primary pink blob */}
-        <div
-          className="absolute w-[600px] h-[600px] rounded-full opacity-25"
-          style={{
-            bottom: '-10%',
-            right: '-15%',
-            background: 'radial-gradient(circle, #FF4D8D 0%, transparent 70%)',
-            filter: 'blur(80px)',
-            animation: 'mesh-float-2 15s ease-in-out infinite',
-          }}
-        />
-        {/* Secondary deep blue blob */}
-        <div
-          className="absolute w-[400px] h-[400px] rounded-full opacity-20"
-          style={{
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            background: 'radial-gradient(circle, #0A1F3C 0%, #2B7FFF 50%, transparent 70%)',
-            filter: 'blur(60px)',
-            animation: 'mesh-float-3 10s ease-in-out infinite',
-          }}
-        />
-        {/* Small purple accent */}
-        <div
-          className="absolute w-[300px] h-[300px] rounded-full opacity-15"
-          style={{
-            top: '70%',
-            left: '10%',
-            background: 'radial-gradient(circle, #B44DFF 0%, transparent 70%)',
-            filter: 'blur(60px)',
-            animation: 'mesh-float-1 18s ease-in-out infinite',
-          }}
-        />
-      </div>
-
-      {/* Subtle grid pattern overlay */}
-      <div className="absolute inset-0 grid-pattern opacity-50" />
+    <div className="relative w-full h-[100dvh] flex flex-col items-center justify-center overflow-hidden" style={{ backgroundColor: '#000000' }}>
+      {/* Subtle radial vignette for depth */}
+      <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at center, rgba(43, 127, 255, 0.06) 0%, transparent 70%)' }} />
 
       {/* Floating hearts/stars — only rendered client-side */}
       {floatingItems.map((item) => (
@@ -136,31 +87,31 @@ export default function WelcomeScreen() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: 'easeOut' as const }}
       >
-        {/* Logo with glow */}
+        {/* Logo — prominent on black background */}
         <motion.div
-          className="relative mb-6"
-          initial={{ scale: 0.5, opacity: 0 }}
+          className="relative mb-4"
+          initial={{ scale: 0.6, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 0.2, duration: 0.6, type: 'spring', bounce: 0.4 }}
         >
-          {/* Glow behind logo */}
+          {/* Soft glow behind logo */}
           <div
-            className="absolute inset-0 -m-10 rounded-full opacity-40"
+            className="absolute inset-0 -m-6 rounded-full"
             style={{
-              background: 'radial-gradient(circle, rgba(43, 127, 255, 0.3) 0%, rgba(255, 77, 141, 0.3) 50%, transparent 70%)',
-              filter: 'blur(24px)',
+              background: 'radial-gradient(circle, rgba(43, 127, 255, 0.2) 0%, rgba(255, 77, 141, 0.15) 50%, transparent 70%)',
+              filter: 'blur(30px)',
             }}
           />
-          <div className="relative w-28 h-28">
+          <div className="relative w-36 h-36">
             <img
               src="/kinzola-logo.png"
               alt="Kinzola"
-              className="w-full h-full object-contain drop-shadow-[0_0_30px_rgba(43,127,255,0.4)]"
+              className="w-full h-full object-contain"
             />
           </div>
         </motion.div>
 
-        {/* App Name - LARGE with gradient + glow */}
+        {/* App Name — full gradient on black background */}
         <motion.h1
           className="text-6xl font-bold mb-4 tracking-tight"
           initial={{ opacity: 0, scale: 0.8 }}
@@ -170,14 +121,14 @@ export default function WelcomeScreen() {
           <span
             className="gradient-text"
             style={{
-              textShadow: '0 0 40px rgba(43, 127, 255, 0.3), 0 0 80px rgba(255, 77, 141, 0.2)',
+              textShadow: '0 0 30px rgba(43, 127, 255, 0.5), 0 0 60px rgba(255, 77, 141, 0.3)',
             }}
           >
             Kinzola
           </span>
         </motion.h1>
 
-        {/* Slogan - gradient text */}
+        {/* Slogan */}
         <motion.p
           className="text-sm font-medium tracking-wide mb-3"
           initial={{ opacity: 0 }}
@@ -194,18 +145,20 @@ export default function WelcomeScreen() {
 
         {/* Tagline */}
         <motion.p
-          className="text-kinzola-muted text-base font-light italic mb-1"
+          className="mb-1"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.7, duration: 0.6 }}
+          style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '16px', fontStyle: 'italic', fontWeight: 300 }}
         >
           Des rencontres sérieuses,
         </motion.p>
         <motion.p
-          className="text-kinzola-muted text-base font-light italic mb-14"
+          className="mb-14"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.8, duration: 0.6 }}
+          style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '16px', fontStyle: 'italic', fontWeight: 300 }}
         >
           des relations durables
         </motion.p>
@@ -242,10 +195,11 @@ export default function WelcomeScreen() {
 
         {/* Terms */}
         <motion.p
-          className="mt-10 text-[11px] text-kinzola-muted/50 max-w-xs"
+          className="mt-10 max-w-xs"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.3, duration: 0.6 }}
+          style={{ color: 'rgba(255, 255, 255, 0.35)', fontSize: '11px' }}
         >
           En continuant, vous acceptez nos Conditions d&apos;utilisation et notre Politique de confidentialité
         </motion.p>
