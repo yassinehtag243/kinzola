@@ -1,8 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE2NDYzNjEwMTMsImV4cCI6MTk2MTkzNzAxM30.placeholder';
+// ─── Config Supabase (fallback direct si env vars absentes) ─────────────
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xchfycabaaqzfmjxkvnu.supabase.co';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhjaGZ5Y2FiYWFxemZtanhrdm51Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyMjc2MzgsImV4cCI6MjA5MDgwMzYzOH0.nH3J_3xPaL3JD1BrLUXbs0phemMvYDbx0hVhdYylGiQ';
 
 // ─── Client public (côté client — React components, pages) ───
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
