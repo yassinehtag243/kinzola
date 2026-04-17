@@ -205,3 +205,22 @@ Stage Summary:
 - 3 pages statiques générées (/ et /_not-found)
 - Serveur running sur localhost:3000
 - App déployée et accessible
+
+---
+Task ID: 10
+Agent: main
+Task: Activer RLS sur Supabase + Configurer Vercel
+
+Work Log:
+- Verifie service_role key JWT
+- Stockee dans .env.local (sans NEXT_PUBLIC_)
+- User active RLS via SQL Editor (11 tables)
+- Test securite: 7/7 tables privees protegees, 0 fuite
+- Ajoute SUPABASE_SERVICE_ROLE sur Vercel
+- Redeploiement #4395463763: success
+
+Stage Summary:
+- RLS 100% operationnel sur Supabase
+- Vercel a jour avec env vars securisees
+- kinzola.vercel.app HTTP 200 + headers securite OK
+
