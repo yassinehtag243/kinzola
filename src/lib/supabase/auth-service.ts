@@ -79,55 +79,32 @@ export async function register(data: RegisterData): Promise<AuthResult> {
     return { user: null, session: null, error: authError };
   }
 
-  // 2 — Create profile via server-side API (uses service_role, bypasses RLS)
-  //    This works even when email confirmation is enabled (no active session).
-  try {
-    const response = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: authData.user.id,
-        email: data.email,
-        pseudo: data.pseudo,
-        name: data.name,
-        age: data.age,
-        gender: data.gender,
-        city: data.city,
-        phone: data.phone,
-        profession: data.profession,
-        religion: data.religion,
-        bio: data.bio,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Erreur serveur' }));
-      // Cleanup: sign out the auth user if profile creation fails
-      await supabase.auth.signOut();
-      return {
-        user: null,
-        session: null,
-        error: {
-          name: 'ProfileError',
-          message: errorData.error || 'Erreur lors de la création du profil',
-          status: response.status,
-        } as AuthError,
-      };
+  // 2 — Le trigger "auto_create_profile()" (SECURITY DEFINER) crée
+  //    automatiquement le profil dans la DB quand un user est créé.
+  //    On essaie de le mettre à jour avec les données complètes.
+  //    Si ça échoue (RLS, pas encore de session), ce n'est pas bloquant :
+  //    le profil existe déjà avec les données par défaut du trigger.
+  if (authData.session) {
+    // Session active (pas de confirmation email requise) → on peut updater
+    try {
+      await supabase
+        .from('profiles')
+        .update({
+          pseudo: data.pseudo,
+          name: data.name,
+          age: data.age,
+          gender: data.gender,
+          city: data.city,
+          profession: data.profession || '',
+          religion: data.religion || '',
+          bio: data.bio || '',
+          phone: data.phone || '',
+          interests: [],
+        })
+        .eq('id', authData.user.id);
+    } catch (updateErr) {
+      console.warn('[AUTH] Profile update after register failed (non-blocking):', updateErr);
     }
-  } catch (fetchError) {
-    // Network error (e.g. "Failed to fetch")
-    console.error('[AUTH] Profile API fetch error:', fetchError);
-    // Cleanup: sign out the auth user
-    await supabase.auth.signOut();
-    return {
-      user: null,
-      session: null,
-      error: {
-        name: 'NetworkError',
-        message: 'Erreur de connexion. Vérifiez votre connexion internet et réessayez.',
-        status: 0,
-      } as AuthError,
-    };
   }
 
   return {
