@@ -285,13 +285,18 @@ export default function RegisterScreen() {
           bio: form.bio,
         });
         if (result.error) {
-          const msg = result.error.message;
-          if (msg.includes('already registered') || msg.includes('already in use')) {
+          const msg = result.error.message || '';
+          const errName = result.error.name || '';
+          if (msg.includes('already registered') || msg.includes('already in use') || msg.includes('Unique')) {
             setRegisterError('Cette adresse e-mail est déjà utilisée');
-          } else if (msg.includes('Password')) {
-            setRegisterError('Le mot de passe ne respecte pas les critères de sécurité');
+          } else if (msg.includes('Password') || msg.includes('mot de passe') || msg.includes('password')) {
+            setRegisterError('Le mot de passe ne respecte pas les critères de sécurité (min. 6 caractères)');
+          } else if (msg.includes('NetworkError') || msg.includes('Failed to fetch') || msg.includes('connexion')) {
+            setRegisterError('Erreur de connexion internet. Vérifiez votre réseau et réessayez.');
+          } else if (msg.includes('profil') || msg.includes('ProfileError')) {
+            setRegisterError('Erreur lors de la création du profil. Veuillez réessayer.');
           } else {
-            setRegisterError(msg || 'Erreur lors de l\'inscription. Veuillez réessayer');
+            setRegisterError('Erreur lors de l\'inscription. Veuillez réessayer.');
           }
           setRegistering(false);
           return;
@@ -315,21 +320,27 @@ export default function RegisterScreen() {
           bio: form.bio,
         });
         if (result.error) {
-          const msg = result.error.message;
-          if (msg.includes('already registered') || msg.includes('already in use')) {
+          const msg = result.error.message || '';
+          const errName = result.error.name || '';
+          if (msg.includes('already registered') || msg.includes('already in use') || msg.includes('Unique')) {
             setRegisterError('Ce numéro de téléphone est déjà utilisé');
-          } else if (msg.includes('Password')) {
-            setRegisterError('Le mot de passe ne respecte pas les critères de sécurité');
+          } else if (msg.includes('Password') || msg.includes('mot de passe') || msg.includes('password')) {
+            setRegisterError('Erreur de sécurité. Veuillez réessayer.');
+          } else if (msg.includes('NetworkError') || msg.includes('Failed to fetch') || msg.includes('connexion')) {
+            setRegisterError('Erreur de connexion internet. Vérifiez votre réseau et réessayez.');
+          } else if (msg.includes('profil') || msg.includes('ProfileError')) {
+            setRegisterError('Erreur lors de la création du profil. Veuillez réessayer.');
           } else {
-            setRegisterError(msg || 'Erreur lors de l\'inscription. Veuillez réessayer');
+            setRegisterError('Erreur lors de l\'inscription. Veuillez réessayer.');
           }
           setRegistering(false);
           return;
         }
         // On success, AuthProvider + AppShell sync will handle Zustand update and navigation
       }
-    } catch {
-      setRegisterError('Erreur de connexion. Veuillez vérifier votre connexion internet');
+    } catch (err) {
+      console.error('[REGISTER] Unexpected error:', err);
+      setRegisterError('Une erreur inattendue est survenue. Veuillez réessayer.');
     } finally {
       setRegistering(false);
     }

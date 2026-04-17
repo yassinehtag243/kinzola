@@ -55,14 +55,15 @@ self.addEventListener('activate', (event) => {
  * Exclut : API routes, Supabase auth, Supabase realtime
  */
 function shouldCache(url: string): boolean {
-  // Jamais cacher les API
+  // Jamais cacher les API internes
   if (url.includes('/api/')) return false;
-  // Jamais cacher les requêtes Supabase auth
-  if (url.includes('/auth/v1/')) return false;
-  // Jamais cacher les requêtes realtime
-  if (url.includes('/realtime/v1/')) return false;
+  // Jamais cacher les requêtes Supabase (auth, REST, storage, realtime)
+  if (url.includes('supabase.co')) return false;
   // Jamais cacher les requêtes POST/PUT/DELETE
-  // (déjà filtré par la stratégie, mais double sécurité)
+  if (url.includes('/auth/v1/')) return false;
+  if (url.includes('/realtime/v1/')) return false;
+  if (url.includes('/rest/v1/')) return false;
+  if (url.includes('/storage/v1/')) return false;
   return true;
 }
 

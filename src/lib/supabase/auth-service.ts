@@ -69,7 +69,7 @@ export type AuthStateChangeCallback = (
  * The `data` object contains everything needed for both steps.
  */
 export async function register(data: RegisterData): Promise<AuthResult> {
-  // 1 — Create the auth user
+  // 1 — Create the auth user via Supabase Auth
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email: data.email,
     password: data.password,
@@ -79,43 +79,53 @@ export async function register(data: RegisterData): Promise<AuthResult> {
     return { user: null, session: null, error: authError };
   }
 
-  // 2 — Insert / update the public profile
-  // id is needed for conflict resolution but not in Insert type — cast required
-  const { error: profileError } = await supabase
-    .from('profiles')
-    .upsert({
-      id: authData.user.id,
-      email: data.email,
-      pseudo: data.pseudo,
-      name: data.name,
-      age: data.age,
-      gender: data.gender,
-      city: data.city,
-      profession: data.profession ?? '',
-      religion: data.religion ?? '',
-      bio: data.bio ?? '',
-      phone: data.phone ?? '',
-      photo_url: '',
-      photo_gallery: [],
-      verified: false,
-      badge_status: 'none',
-      interests: [],
-      online: true,
-      last_seen: new Date().toISOString(),
-      discover_intent: 'amitie',
-      text_size: 16,
-    } as any, { onConflict: 'id' });
+  // 2 — Create profile via server-side API (uses service_role, bypasses RLS)
+  //    This works even when email confirmation is enabled (no active session).
+  try {
+    const response = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: authData.user.id,
+        email: data.email,
+        pseudo: data.pseudo,
+        name: data.name,
+        age: data.age,
+        gender: data.gender,
+        city: data.city,
+        phone: data.phone,
+        profession: data.profession,
+        religion: data.religion,
+        bio: data.bio,
+      }),
+    });
 
-  if (profileError) {
-    // Best-effort cleanup: delete the auth user if profile creation fails
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Erreur serveur' }));
+      // Cleanup: sign out the auth user if profile creation fails
+      await supabase.auth.signOut();
+      return {
+        user: null,
+        session: null,
+        error: {
+          name: 'ProfileError',
+          message: errorData.error || 'Erreur lors de la création du profil',
+          status: response.status,
+        } as AuthError,
+      };
+    }
+  } catch (fetchError) {
+    // Network error (e.g. "Failed to fetch")
+    console.error('[AUTH] Profile API fetch error:', fetchError);
+    // Cleanup: sign out the auth user
     await supabase.auth.signOut();
     return {
       user: null,
       session: null,
       error: {
-        name: 'ProfileError',
-        message: profileError.message,
-        status: profileError.code ? parseInt(profileError.code, 10) : 500,
+        name: 'NetworkError',
+        message: 'Erreur de connexion. Vérifiez votre connexion internet et réessayez.',
+        status: 0,
       } as AuthError,
     };
   }
