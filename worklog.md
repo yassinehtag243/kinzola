@@ -267,3 +267,26 @@ Stage Summary:
 - Files modified: settings-screen.tsx, edit-personal-info.tsx, use-kinzola-store.ts, edit-profile.tsx, adapter.ts, auth-service.ts
 - Build passes: Next.js 16.1.3 build successful
 - Key behavior changes: logout forces page reload, profile edits show errors if Supabase update fails
+---
+Task ID: 2
+Agent: main
+Task: Fix auto-login, logout button, and splash screen
+
+Work Log:
+- Root cause: SplashScreen appeared EVERY time app was opened (blocking auto-login)
+- Root cause: After logout, window.location.href='/' reloaded page but Supabase session persisted
+- Root cause: app-shell.tsx sync had bug: name was set to pseudo instead of profile.name
+- Fixed splash-screen.tsx: Now checks localStorage 'kinzola-splash-seen', skips directly if already seen
+- Fixed splash-screen.tsx: On first launch, marks splash as seen after user taps
+- Fixed splash-screen.tsx: navigateAway checks Supabase session and goes to main/welcome directly
+- Fixed app-shell.tsx: Fixed name field (was pseudo || name, now name || '')
+- Fixed app-shell.tsx: Added fetchAllData() call when session is restored for auto-login
+- Fixed auth-context.tsx: logout now removes 'kinzola-splash-seen' from localStorage
+- Fixed settings-screen.tsx: logout removes 'kinzola-splash-seen' before reloading
+- Updated SW version to v4 to force cache refresh
+
+Stage Summary:
+- Splash screen: shows only on first launch, skipped on subsequent opens
+- Auto-login: Supabase session is restored, user goes directly to main screen
+- Logout: clears session, clears splash flag, reloads to welcome screen
+- Build passes: Next.js 16.1.3 build successful

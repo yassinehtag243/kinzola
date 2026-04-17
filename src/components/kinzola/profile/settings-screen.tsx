@@ -1774,7 +1774,7 @@ export default function SettingsScreen() {
                 await logout();
                 // Forcer la réinitialisation complète
                 if (typeof window !== 'undefined') {
-                  localStorage.removeItem('kinzola-auth-session');
+                  localStorage.removeItem('kinzola-splash-seen');
                   window.location.href = '/';
                 }
               } catch (err) {

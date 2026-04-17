@@ -8,28 +8,34 @@ import { supabase } from '@/lib/supabase/client';
 /**
  * SplashScreen — écran d'intro avec vidéo sur fond noir.
  *
- * Flux :
- * 1. Écran "Appuyez pour démarrer" (débloque le son du navigateur)
- * 2. Lecture de la vidéo avec son du battement de cœur
- * 3. À la fin → transition vers Découvrir (si connecté) ou Bienvenue (sinon)
- * 4. Bouton "Passer" pour sauter à tout moment
+ * AFFICHÉ UNIQUEMENT AU PREMIER LANCEMENT.
+ * Après ça, l'app vérifie la session Supabase et va directement
+ * à l'écran principal (si connecté) ou à l'accueil (sinon).
  */
 export default function SplashScreen() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const navigatedRef = useRef(false);
-  const { setScreen, setTab } = useKinzolaStore();
+  const { setScreen, setTab, isAuthenticated } = useKinzolaStore();
 
-  // Étape 1 : écran d'accueil "Touchez pour démarrer"
-  // Étape 2 : vidéo en lecture
   const [step, setStep] = useState<'tap' | 'playing' | 'exiting'>('tap');
   const [visible, setVisible] = useState(true);
+  const [skipSplash, setSkipSplash] = useState(false);
+
+  // ─── Au montage : vérifier si le splash a déjà été vu ───
+  useEffect(() => {
+    const splashSeen = localStorage.getItem('kinzola-splash-seen');
+    if (splashSeen) {
+      // Le splash a déjà été vu → skip directement
+      setSkipSplash(true);
+      navigateAway();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Navigate to the correct screen after splash ───
   const navigateAway = useCallback(async () => {
     if (navigatedRef.current) return;
     navigatedRef.current = true;
     setStep('exiting');
-    setVisible(false);
 
     // Check Supabase session first (source of truth for auth)
     let hasSession = false;
@@ -40,35 +46,33 @@ export default function SplashScreen() {
       // If Supabase check fails, fall back to Zustand state
     }
 
+    if (hasSession || isAuthenticated) {
+      setTab('discover');
+      setScreen('main');
+    } else {
+      setScreen('welcome');
+    }
+
+    // Petit délai pour la transition visuelle
     setTimeout(() => {
-      if (hasSession) {
-        setTab('discover');
-        setScreen('main');
-      } else {
-        const { isAuthenticated } = useKinzolaStore.getState();
-        if (isAuthenticated) {
-          setTab('discover');
-          setScreen('main');
-        } else {
-          setScreen('welcome');
-        }
-      }
-    }, 500);
-  }, [setScreen, setTab]);
+      setVisible(false);
+    }, 300);
+  }, [setScreen, setTab, isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── On tap: unlock audio + play video ───
   const handleStart = useCallback(async () => {
     const video = videoRef.current;
     if (!video) return;
 
-    // Forcer le son activé AVANT le play (nécessite une interaction utilisateur)
+    // Marquer le splash comme vu pour les prochaines ouvertures
+    localStorage.setItem('kinzola-splash-seen', 'true');
+
     video.muted = false;
     video.volume = 1;
     video.playsInline = true;
     video.setAttribute('playsinline', '');
 
     try {
-      // Débloquer le contexte audio du navigateur
       const AudioContext = window.AudioContext || (window as unknown as { webkitAudioContext: typeof window.AudioContext }).webkitAudioContext;
       if (AudioContext) {
         const ctx = new AudioContext();
@@ -78,14 +82,13 @@ export default function SplashScreen() {
         ctx.close().catch(() => {});
       }
     } catch {
-      // AudioContext non supporté, pas grave
+      // AudioContext non supporté
     }
 
     try {
       await video.play();
       setStep('playing');
     } catch {
-      // Si toujours bloqué, essayer en muet
       video.muted = true;
       try {
         await video.play();
@@ -118,6 +121,9 @@ export default function SplashScreen() {
       }
     };
   }, []);
+
+  // Si le splash doit être skippé, ne rien rendre
+  if (skipSplash) return null;
 
   return (
     <AnimatePresence>

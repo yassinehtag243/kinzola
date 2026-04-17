@@ -196,6 +196,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       showEditPersonalInfo: false,
       showEditProfile: false,
     });
+    // Supprimer le flag splash pour que l'écran d'accueil se montre au prochain lancement
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('kinzola-splash-seen');
+    }
   }, []);
 
   // ── Action: updateProfile ──

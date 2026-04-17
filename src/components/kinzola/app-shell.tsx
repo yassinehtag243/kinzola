@@ -173,7 +173,7 @@ export default function AppShell() {
           user: {
             id: supabaseProfile.id,
             pseudo: supabaseProfile.pseudo || '',
-            name: supabaseProfile.pseudo || supabaseProfile.name,
+            name: supabaseProfile.name || '',
             email: supabaseProfile.email || '',
             phone: supabaseProfile.phone || '',
             age: supabaseProfile.age || 18,
@@ -193,6 +193,8 @@ export default function AppShell() {
           },
           currentScreen: 'main',
         });
+        // Charger toutes les données (profils, matchs, messages, etc.)
+        useKinzolaStore.getState().fetchAllData().catch(console.error);
       }
     } else if (!supabaseAuthenticated && !authLoading) {
       const storeState = useKinzolaStore.getState();
