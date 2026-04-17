@@ -188,6 +188,7 @@ export default function AppShell() {
             verified: supabaseProfile.verified ?? false,
             preferences: { ageMin: 18, ageMax: 50, city: 'Kinshasa', gender: 'tous', religion: '' },
             createdAt: supabaseProfile.created_at || new Date().toISOString(),
+            lastSeen: supabaseProfile.last_seen || new Date().toISOString(),
           },
           currentScreen: 'main',
         });

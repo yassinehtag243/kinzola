@@ -237,7 +237,7 @@ export default function NewsScreen() {
             transition={{
               duration: 0.6,
               repeat: 0,
-              ease: 'easeInOut',
+              ease: 'easeInOut' as const,
             }}
           >
             <Bell className="w-5 h-5" />
@@ -265,7 +265,7 @@ export default function NewsScreen() {
               className="absolute inset-0 rounded-full"
               style={{ border: '1px solid rgba(255, 77, 141, 0.3)' }}
               animate={{ scale: [1, 1.3], opacity: [0.5, 0] }}
-              transition={{ duration: 1.5, repeat: Infinity, ease: 'easeOut' }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: 'easeOut' as const }}
             />
           )}
         </motion.button>
@@ -500,7 +500,7 @@ export default function NewsScreen() {
                     <span className="flex items-center gap-1">
                       <motion.span
                         animate={{ rotate: 360 }}
-                        transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
+                        transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' as const }}
                         className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full"
                       />
                       <span className="text-[11px]">...</span>
@@ -927,7 +927,7 @@ export default function NewsScreen() {
                           <span className="flex items-center gap-1.5">
                             <motion.span
                               animate={{ rotate: 360 }}
-                              transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
+                              transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' as const }}
                               className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full"
                             />
                             Publier...

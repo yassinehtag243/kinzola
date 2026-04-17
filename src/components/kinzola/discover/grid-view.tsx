@@ -91,7 +91,7 @@ const GridCard = memo(function GridCard({ profile, index, onLike, onPass, onSele
               boxShadow: '0 0 0 2px rgba(6, 14, 26, 0.8), 0 0 8px rgba(74, 222, 128, 0.6)',
             }}
             animate={{ scale: [1, 1.3, 1] }}
-            transition={{ type: 'tween', duration: 2, repeat: Infinity }}
+            transition={{ type: 'tween' as const, duration: 2, repeat: Infinity }}
           />
         )}
 

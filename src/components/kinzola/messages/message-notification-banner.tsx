@@ -46,7 +46,9 @@ export default function MessageNotificationBanner() {
     prevNotifCount.current = currentCount;
 
     const newNotif = notifications[0];
-    if (!newNotif || newNotif.type !== 'message') return;
+    if (!newNotif || newNotif.type === 'system') return;
+    // Accept any social notification (match, like, love_interest, etc.)
+    // as it could indicate a new conversation/match
 
     // Find the conversation
     const conv = conversations.find(c =>
@@ -143,10 +145,10 @@ export default function MessageNotificationBanner() {
   // Exit animation variants based on swipe direction
   const exitVariants = {
     exit: exitDirection === -1
-      ? { x: -500, opacity: 0, scale: 0.9, transition: { duration: 0.25, ease: 'easeOut' } }
+      ? { x: -500, opacity: 0, scale: 0.9, transition: { duration: 0.25, ease: 'easeOut' as const } }
       : exitDirection === 1
-        ? { x: 500, opacity: 0, scale: 0.9, transition: { duration: 0.25, ease: 'easeOut' } }
-        : { y: -120, opacity: 0, scale: 0.95, transition: { type: 'spring', damping: 25, stiffness: 350 } },
+        ? { x: 500, opacity: 0, scale: 0.9, transition: { duration: 0.25, ease: 'easeOut' as const } }
+        : { y: -120, opacity: 0, scale: 0.95, transition: { type: 'spring' as const, damping: 25, stiffness: 350 } },
   };
 
   return (

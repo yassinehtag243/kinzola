@@ -628,7 +628,7 @@ export default function NotificationPanel() {
                         <Bell className="w-12 h-12 text-kinzola-muted/40" />
                         <motion.div
                           animate={{ scale: [1, 1.1, 1] }}
-                          transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
+                          transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' as const }}
                           className="absolute inset-0 rounded-full"
                           style={{ background: 'rgba(255, 255, 255, 0.03)' }}
                         />

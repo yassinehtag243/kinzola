@@ -45,7 +45,7 @@ export function useBrowserNotifications() {
         silent: true,
         vibrate: [200, 100, 200],
         ...options,
-      });
+      } as NotificationOptions & { renotify?: boolean; vibrate?: number[] });
       setTimeout(() => { notif.close(); }, 8000);
     };
 
@@ -64,7 +64,7 @@ export function useBrowserNotifications() {
               silent: true,
               vibrate: [200, 100, 200],
               ...options,
-            });
+            } as NotificationOptions & { renotify?: boolean; vibrate?: number[] });
           } catch { showFallback(); }
         }).catch(() => { clearTimeout(timeout); showFallback(); });
       } else {
@@ -92,7 +92,7 @@ export function showMessageNotification(
   if (Notification.permission !== 'granted') return;
 
   const showFallback = () => {
-    const notif = new Notification(title, { body, icon: icon || '/favicon.ico', silent: true, vibrate: [200, 100, 200] });
+    const notif = new Notification(title, { body, icon: icon || '/favicon.ico', silent: true, vibrate: [200, 100, 200] } as NotificationOptions & { vibrate?: number[] });
     setTimeout(() => { notif.close(); }, 8000);
   };
 
@@ -117,7 +117,7 @@ export function showMessageNotification(
               { action: 'mark-read', title: 'Marqué comme lu' },
               { action: 'silence', title: 'Silence' },
             ],
-          });
+          } as any);
         } catch { showFallback(); }
       }).catch(() => { clearTimeout(timeout); showFallback(); });
     } else {

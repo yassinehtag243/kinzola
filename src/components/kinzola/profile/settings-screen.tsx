@@ -60,7 +60,7 @@ function SettingsSection({ title, subtitle, children, index }: {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.06, duration: 0.4, ease: 'easeOut' }}
+      transition={{ delay: index * 0.06, duration: 0.4, ease: 'easeOut' as const }}
     >
       <div className="mb-2 px-1">
         <p className={`text-[11px] font-semibold uppercase tracking-wider ${isLight ? 'text-gray-400' : 'text-kinzola-muted'}`}>
@@ -694,7 +694,7 @@ function BadgeVerificationModal({ onClose, onToast }: { onClose: () => void; onT
               <div className="flex justify-center mb-4">
                 <motion.div
                   animate={{ scale: [1, 1.05, 1] }}
-                  transition={{ type: 'tween', duration: 2, repeat: Infinity }}
+                  transition={{ type: 'tween' as const, duration: 2, repeat: Infinity }}
                   className="w-24 h-24 rounded-full flex items-center justify-center"
                   style={{
                     background: 'linear-gradient(135deg, rgba(43, 127, 255, 0.15), rgba(43, 127, 255, 0.05))',
@@ -855,7 +855,7 @@ function BadgeVerificationModal({ onClose, onToast }: { onClose: () => void; onT
                 >
                   <motion.div
                     animate={{ scale: [1, 1.1, 1] }}
-                    transition={{ type: 'tween', duration: 1.5, repeat: Infinity }}
+                    transition={{ type: 'tween' as const, duration: 1.5, repeat: Infinity }}
                   >
                     <Camera className={`w-10 h-10 ${isLight ? 'text-gray-300' : 'text-white/20'}`} />
                   </motion.div>
@@ -889,7 +889,7 @@ function BadgeVerificationModal({ onClose, onToast }: { onClose: () => void; onT
             <motion.div key="processing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center py-8">
               <motion.div
                 animate={{ rotate: 360 }}
-                transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+                transition={{ duration: 3, repeat: Infinity, ease: 'linear' as const }}
                 className="w-20 h-20 rounded-full flex items-center justify-center mb-6"
                 style={{
                   background: 'linear-gradient(135deg, rgba(43, 127, 255, 0.1), rgba(255, 77, 141, 0.1))',
@@ -1664,7 +1664,7 @@ export default function SettingsScreen() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 7 * 0.06, duration: 0.4, ease: 'easeOut' }}
+          transition={{ delay: 7 * 0.06, duration: 0.4, ease: 'easeOut' as const }}
           className="space-y-3 pb-4"
         >
           <motion.button

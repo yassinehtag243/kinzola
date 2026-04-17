@@ -104,11 +104,11 @@ export default function WelcomeScreen() {
             scale: [0.8, 1.2, 0.8],
           }}
           transition={{
-            type: 'tween',
+            type: 'tween' as const,
             duration: item.duration,
             repeat: Infinity,
             delay: item.delay,
-            ease: 'easeInOut',
+            ease: 'easeInOut' as const,
           }}
         >
           {item.type === 'heart' ? (
@@ -134,7 +134,7 @@ export default function WelcomeScreen() {
         className="relative z-10 flex flex-col items-center px-8 text-center"
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, ease: 'easeOut' }}
+        transition={{ duration: 0.8, ease: 'easeOut' as const }}
       >
         {/* Logo with glow */}
         <motion.div

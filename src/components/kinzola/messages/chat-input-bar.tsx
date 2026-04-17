@@ -687,7 +687,7 @@ export default memo(function ChatInputBar({ conversationId, onSendMessage, onSen
                     ) : (
                       <motion.div
                         animate={{ scale: [1, 1.4, 1], opacity: [1, 0.5, 1] }}
-                        transition={{ type: 'tween', duration: 1.2, repeat: Infinity }}
+                        transition={{ type: 'tween' as const, duration: 1.2, repeat: Infinity }}
                         className="w-3 h-3 rounded-full bg-red-500 flex-shrink-0"
                       />
                     )}
@@ -882,7 +882,7 @@ export default memo(function ChatInputBar({ conversationId, onSendMessage, onSen
                         scale: isEmpty ? 1 : 0.5,
                         rotate: isEmpty ? 0 : 90,
                       }}
-                      transition={{ duration: 0.35, ease: 'easeInOut' }}
+                      transition={{ duration: 0.35, ease: 'easeInOut' as const }}
                       onClick={handleMicClick}
                       className="absolute inset-0 rounded-full glass flex items-center justify-center cursor-pointer transition-all duration-300 select-none"
                       aria-label="Enregistrer un message vocal"
@@ -900,7 +900,7 @@ export default memo(function ChatInputBar({ conversationId, onSendMessage, onSen
                         scale: isEmpty ? 0.5 : 1,
                         rotate: isEmpty ? -90 : 0,
                       }}
-                      transition={{ duration: 0.35, ease: 'easeInOut' }}
+                      transition={{ duration: 0.35, ease: 'easeInOut' as const }}
                       whileTap={{ scale: 0.8 }}
                       onClick={sendMessage}
                       className="absolute inset-0 rounded-full flex items-center justify-center cursor-pointer"

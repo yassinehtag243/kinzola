@@ -162,7 +162,7 @@ export default function OnlineUsersSection({
               initial={{ opacity: 0, y: 10, scale: 0.9 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{
-                type: 'tween',
+                type: 'tween' as const,
                 duration: 0.3,
                 delay: index * 0.04,
               }}
@@ -219,10 +219,10 @@ export default function OnlineUsersSection({
                     scale: [1, 1.15, 1],
                   }}
                   transition={{
-                    type: 'tween',
+                    type: 'tween' as const,
                     duration: 2.5,
                     repeat: Infinity,
-                    ease: 'easeInOut',
+                    ease: 'easeInOut' as const,
                     delay: index * 0.2,
                   }}
                 >

@@ -116,14 +116,14 @@ const usePushNotifications = (): PushNotificationState & PushNotificationActions
     }) => {
       if (!('Notification' in window) || Notification.permission !== 'granted') return;
 
-      const notificationOptions: NotificationOptions = {
+      const notificationOptions: NotificationOptions & { data?: object; actions?: object[] } = {
         body: options.body,
         icon: options.icon || '/kinzola-logo.png',
         badge: '/kinzola-logo.png',
         tag: options.tag || `kinzola-${Date.now()}`,
         silent: true,
         data: options.data || {},
-        actions: options.actions || [],
+        ...(options.actions ? { actions: options.actions } : {}),
       };
 
       // Try via service worker first (works even when app is in background)

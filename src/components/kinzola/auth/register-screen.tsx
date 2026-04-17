@@ -345,12 +345,12 @@ export default function RegisterScreen() {
     exit: (direction: number) => ({ x: direction > 0 ? -100 : 100, opacity: 0 }),
   };
 
-  const focusInput = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const focusInput = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     e.currentTarget.style.boxShadow = '0 0 20px rgba(43, 127, 255, 0.2)';
     e.currentTarget.style.borderColor = 'rgba(43, 127, 255, 0.5)';
   };
 
-  const blurInput = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const blurInput = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     e.currentTarget.style.boxShadow = 'none';
     e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
   };
@@ -400,7 +400,7 @@ export default function RegisterScreen() {
             className="h-full rounded-full"
             style={{ background: 'linear-gradient(135deg, #2B7FFF, #FF4D8D)' }}
             animate={{ width: `${(registerStep / 3) * 100}%` }}
-            transition={{ duration: 0.5, ease: 'easeInOut' }}
+            transition={{ duration: 0.5, ease: 'easeInOut' as const }}
           />
         </div>
         <p className="text-xs text-kinzola-muted mt-2 text-center font-light">
@@ -542,7 +542,7 @@ export default function RegisterScreen() {
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -20 }}
-                          transition={{ duration: 0.4, ease: 'easeOut' }}
+                          transition={{ duration: 0.4, ease: 'easeOut' as const }}
                           className="space-y-4"
                         >
                           <p className="text-sm text-kinzola-muted text-center">
@@ -610,7 +610,7 @@ export default function RegisterScreen() {
                           initial={{ opacity: 0, scale: 0.8 }}
                           animate={{ opacity: 1, scale: 1 }}
                           exit={{ opacity: 0, scale: 0.8 }}
-                          transition={{ duration: 0.5, ease: 'easeOut' }}
+                          transition={{ duration: 0.5, ease: 'easeOut' as const }}
                           className="flex flex-col items-center justify-center py-4 space-y-3"
                         >
                           <motion.div
@@ -745,7 +745,7 @@ export default function RegisterScreen() {
                       <motion.div
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.5, ease: 'easeOut' }}
+                        transition={{ duration: 0.5, ease: 'easeOut' as const }}
                         className="flex flex-col items-center justify-center py-6 space-y-3"
                       >
                         <motion.div

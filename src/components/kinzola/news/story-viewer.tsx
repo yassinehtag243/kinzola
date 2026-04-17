@@ -54,7 +54,7 @@ const heartPopVariant = {
   animate: {
     scale: [0, 1.3, 1],
     opacity: [0, 1, 1],
-    transition: { type: 'tween', duration: 0.4, ease: 'easeOut' },
+    transition: { type: 'tween' as const, duration: 0.4, ease: 'easeOut' as const },
   },
   exit: {
     scale: 1,
@@ -71,7 +71,7 @@ function ProgressBar({ progress, isActive }: { progress: number; isActive: boole
         style={{ background: 'linear-gradient(135deg, #2B7FFF, #FF4D8D)' }}
         initial={{ width: isActive ? '0%' : '100%' }}
         animate={{ width: `${progress}%` }}
-        transition={isActive ? { duration: STORY_DURATION / 1000, ease: 'linear' } : { duration: 0 }}
+        transition={isActive ? { duration: STORY_DURATION / 1000, ease: 'linear' as const } : { duration: 0 }}
       />
     </div>
   );
@@ -232,7 +232,7 @@ export default function StoryViewer({ stories, initialIndex, onClose }: StoryVie
           initial="enter"
           animate="center"
           exit="exit"
-          transition={{ duration: 0.3, ease: 'easeInOut' }}
+          transition={{ duration: 0.3, ease: 'easeInOut' as const }}
           className="absolute inset-0"
         >
           <StoryContent story={story} />
@@ -356,7 +356,7 @@ export default function StoryViewer({ stories, initialIndex, onClose }: StoryVie
             >
               <motion.div
                 animate={isLiked ? { scale: [1, 1.3, 1] } : {}}
-                transition={{ type: 'tween', duration: 0.3 }}
+                transition={{ type: 'tween' as const, duration: 0.3 }}
               >
                 <Heart
                   className={`w-6 h-6 transition-colors ${

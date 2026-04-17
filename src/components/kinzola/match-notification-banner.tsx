@@ -84,10 +84,10 @@ export default function MatchNotificationBanner() {
 
   const exitVariants = {
     exit: exitDirection === -1
-      ? { x: -500, opacity: 0, scale: 0.9, transition: { duration: 0.25, ease: 'easeOut' } }
+      ? { x: -500, opacity: 0, scale: 0.9, transition: { duration: 0.25, ease: 'easeOut' as const } }
       : exitDirection === 1
-        ? { x: 500, opacity: 0, scale: 0.9, transition: { duration: 0.25, ease: 'easeOut' } }
-        : { y: -120, opacity: 0, transition: { type: 'spring', damping: 25, stiffness: 300 } },
+        ? { x: 500, opacity: 0, scale: 0.9, transition: { duration: 0.25, ease: 'easeOut' as const } }
+        : { y: -120, opacity: 0, transition: { type: 'spring' as const, damping: 25, stiffness: 300 } },
   };
 
   return (

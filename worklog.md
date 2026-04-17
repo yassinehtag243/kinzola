@@ -160,3 +160,31 @@ Stage Summary:
 - All 5 realtime tables active: messages, conversations, notifications, matches, profiles
 - Heartbeat keeps online status current every 30 seconds
 - Graceful cleanup on unmount/logout/beforeunload
+
+---
+Task ID: 8
+Agent: main
+Task: Phase 6 - Production (Security, PWA, Performance, Cleanup)
+
+Work Log:
+- **next.config.ts** — Sécurisé : `reactStrictMode: true`, `poweredByHeader: false`, headers sécurité (HSTS, X-Frame-Options, X-XSS-Protection, X-Content-Type-Options, Referrer-Policy, Permissions-Policy), CSP pour /api/, configuration images Supabase
+- **src/middleware.ts** — Créé : rate limiting par IP (auth: 5/15s, messages: 30/min, default: 60/min, moderation: 10/min), blocage de /api/setup-database, correlation ID
+- **public/manifest.json** — Optimisé : icons corrects (192/512 + maskable), shortcuts (Messages, Découvrir), share_target, description enrichie, theme_color #2B7FFF
+- **src/app/layout.tsx** — Metadata complète : metadataBase, template title, OpenGraph (locale, siteName, images), Twitter Card, robots (noindex pour app auth), apple-touch-icon, manifest link, preconnect Supabase, themeColor adaptatif (light/dark), userScalable: true
+- **src/app/error.tsx** — Page d'erreur personnalisée avec boutons Réessayer/Accueil + design Kinzola
+- **src/app/not-found.tsx** — Page 404 personnalisée avec gradient 404 + bouton retour
+- **src/app/loading.tsx** — Spinner animé double anneau Kinzola
+- **public/sw.js** — V2 : cache intelligent (API = network-only, static assets = cache-first, HTML = stale-while-revalidate), exclusions /api/ et Supabase auth, badge/icon mis à jour
+- **15 routes API legacy supprimées** — /api/auth, /api/profiles, /api/kinzola/* (toutes les routes Prisma/SQLite non sécurisées)
+- **Dossiers supprimés** : examples/, prisma/, skills/, src/lib/firebase/, firebase-status-banner.tsx
+- **20+ corrections TypeScript** : Framer Motion ease/type as const, Notification API types, nullable types, FocusEvent types
+- **Bug fix** : lastSeen manquant dans le sync Supabase↔Zustand (app-shell.tsx)
+
+Stage Summary:
+- Build production : 0 erreur ✅
+- 3 pages statiques (/ et /_not-found)
+- Middleware proxy actif sur /api/*
+- Toutes les legacy routes supprimées (nettoyage complet)
+- PWA installable avec manifest optimisé
+- Headers de sécurité sur toutes les routes
+- Rate limiting anti brute-force

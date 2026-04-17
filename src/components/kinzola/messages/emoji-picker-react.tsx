@@ -137,7 +137,7 @@ export default memo(function EmojiPickerReact({ onSelect, onClose }: EmojiPicker
             previewConfig={{ showPreview: false }}
             width="100%"
             height={280}
-            theme={isLight ? 'light' : 'dark'}
+            theme={isLight ? 'light' as any : 'dark' as any}
             className="kinzola-emoji-picker"
             lazyLoadEmojis
           />

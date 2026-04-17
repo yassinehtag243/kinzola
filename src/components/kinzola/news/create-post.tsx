@@ -166,7 +166,7 @@ export default function CreatePost() {
                   <span className="flex items-center gap-1.5">
                     <motion.span
                       animate={{ rotate: 360 }}
-                      transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
+                      transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' as const }}
                       className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
                     />
                     Publication...
@@ -224,7 +224,7 @@ export default function CreatePost() {
                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                   <motion.span
                     animate={{ rotate: 360 }}
-                    transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
+                    transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' as const }}
                     className="inline-block w-8 h-8 border-3 border-white/30 border-t-white rounded-full"
                   />
                 </div>

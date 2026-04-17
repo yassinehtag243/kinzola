@@ -126,7 +126,7 @@ export default function SplashScreen() {
           key="kinzola-splash"
           initial={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.5, ease: 'easeInOut' }}
+          transition={{ duration: 0.5, ease: 'easeInOut' as const }}
           className="fixed inset-0 z-[200] flex items-center justify-center select-none"
           style={{ backgroundColor: '#000000', touchAction: 'manipulation' }}
         >
@@ -161,7 +161,7 @@ export default function SplashScreen() {
               {/* Pulsating heartbeat icon */}
               <motion.div
                 animate={{ scale: [1, 1.15, 1], opacity: [0.7, 1, 0.7] }}
-                transition={{ type: 'tween', duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+                transition={{ type: 'tween' as const, duration: 1.5, repeat: Infinity, ease: 'easeInOut' as const }}
                 className="mb-8"
               >
                 <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#FF4D8D" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -199,7 +199,7 @@ export default function SplashScreen() {
               {/* Pulsating ring */}
               <motion.div
                 animate={{ scale: [1, 1.6, 1], opacity: [0.3, 0, 0.3] }}
-                transition={{ type: 'tween', duration: 2, repeat: Infinity, ease: 'easeOut' }}
+                transition={{ type: 'tween' as const, duration: 2, repeat: Infinity, ease: 'easeOut' as const }}
                 className="absolute w-24 h-24 rounded-full"
                 style={{ border: '1px solid rgba(255, 77, 141, 0.3)' }}
               />

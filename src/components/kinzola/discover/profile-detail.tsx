@@ -208,7 +208,7 @@ export default function ProfileDetail() {
                   '0 0 6px rgba(74, 222, 128, 0.4)',
                 ],
               }}
-              transition={{ type: 'tween', duration: 2, repeat: Infinity }}
+              transition={{ type: 'tween' as const, duration: 2, repeat: Infinity }}
             />
           ) : null}
         </div>
@@ -289,7 +289,7 @@ export default function ProfileDetail() {
                 initial={{ scale: 1, opacity: 0.6 }}
                 animate={{ scale: 1.8, opacity: 0 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.6, ease: 'easeOut' }}
+                transition={{ duration: 0.6, ease: 'easeOut' as const }}
                 className="absolute inset-0 rounded-full z-0"
                 style={{
                   background: 'linear-gradient(135deg, #FFD700, #2B7FFF)',
@@ -311,7 +311,7 @@ export default function ProfileDetail() {
                   y: Math.sin((p.angle * Math.PI) / 180) * p.distance,
                 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.7, ease: 'easeOut' }}
+                transition={{ duration: 0.7, ease: 'easeOut' as const }}
                 className="absolute top-1/2 left-1/2 w-2 h-2 rounded-full z-20"
                 style={{
                   background: 'linear-gradient(135deg, #FFD700, #FFA500)',
@@ -337,7 +337,7 @@ export default function ProfileDetail() {
           >
             <motion.div
               animate={superLikeAnimating ? { rotate: 360 } : { rotate: 0 }}
-              transition={superLikeAnimating ? { duration: 0.5, ease: 'easeInOut' } : { duration: 0 }}
+              transition={superLikeAnimating ? { duration: 0.5, ease: 'easeInOut' as const } : { duration: 0 }}
             >
               <Star className="w-5 h-5 text-white fill-white" />
             </motion.div>
@@ -363,7 +363,7 @@ export default function ProfileDetail() {
                 initial={{ scale: 1, opacity: 0.8 }}
                 animate={{ scale: 2.2, opacity: 0 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.5, ease: 'easeOut' }}
+                transition={{ duration: 0.5, ease: 'easeOut' as const }}
                 className="absolute inset-0 rounded-full z-0"
                 style={{
                   background: 'linear-gradient(135deg, #2B7FFF, #FF4D8D)',
@@ -384,8 +384,8 @@ export default function ProfileDetail() {
             <motion.div
               animate={likeAnimating ? { scale: [1, 1.3, 1] } : { scale: 1 }}
               transition={likeAnimating ? {
-                type: 'tween',
-                ease: 'easeInOut',
+                type: 'tween' as const,
+                ease: 'easeInOut' as const,
                 duration: 0.4,
               } : { duration: 0 }}
             >

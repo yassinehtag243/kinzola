@@ -62,7 +62,7 @@ function BioSection({ bio }: { bio: string }) {
             key={expanded ? 'expanded' : 'collapsed'}
             initial={{ height: expanded ? 72 : 'auto' }}
             animate={{ height: expanded ? 'auto' : 72 }}
-            transition={{ duration: 0.3, ease: 'easeInOut' }}
+            transition={{ duration: 0.3, ease: 'easeInOut' as const }}
             className="text-sm leading-relaxed overflow-hidden"
             style={{ color: 'rgba(255,255,255,0.75)' }}
           >
@@ -135,7 +135,7 @@ function StatCard({ label, value, icon: Icon, color, delay }: {
     <motion.div
       initial={{ opacity: 0, y: 15, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ delay, duration: 0.4, ease: 'easeOut' }}
+      transition={{ delay, duration: 0.4, ease: 'easeOut' as const }}
       className="glass-card p-4 text-center flex-1 min-w-0"
     >
       <Icon className="w-5 h-5 mx-auto mb-1.5" style={{ color }} />
@@ -363,7 +363,7 @@ export default function ProfileScreen() {
         <motion.div
           initial={{ scaleX: 0 }}
           animate={{ scaleX: 1 }}
-          transition={{ duration: 0.8, ease: 'easeOut' }}
+          transition={{ duration: 0.8, ease: 'easeOut' as const }}
           className="absolute bottom-0 left-0 right-0 h-[3px]"
           style={{
             background: 'linear-gradient(90deg, #2B7FFF, #FF4D8D, #a855f7, #2B7FFF)',

@@ -37,7 +37,7 @@ function ConfettiParticle({ index }: { index: number }) {
         rotate: [0, 360],
       }}
       transition={{
-        type: 'tween',
+        type: 'tween' as const,
         duration: 2,
         delay: index * 0.1,
         repeat: Infinity,
@@ -97,7 +97,7 @@ export default function MatchModal() {
         <motion.div
           className="relative mb-6"
           animate={{ scale: [1, 1.2, 1] }}
-          transition={{ type: 'tween', duration: 1, repeat: Infinity }}
+          transition={{ type: 'tween' as const, duration: 1, repeat: Infinity }}
         >
           <Heart
             className="w-20 h-20 text-kinzola-pink fill-kinzola-pink"
@@ -148,7 +148,7 @@ export default function MatchModal() {
 
           <motion.div
             animate={{ rotate: [0, 15, -15, 0] }}
-            transition={{ type: 'tween', duration: 1.5, repeat: Infinity, delay: 0.5 }}
+            transition={{ type: 'tween' as const, duration: 1.5, repeat: Infinity, delay: 0.5 }}
           >
             <Heart className="w-8 h-8 text-kinzola-pink fill-kinzola-pink" />
           </motion.div>

@@ -99,7 +99,7 @@ export default function EditProfile() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       if (ev.target?.result) {
-        setLocalGallery(prev => [...prev, ev.target.result as string]);
+        setLocalGallery(prev => [...prev, ev.target!.result as string]);
       }
     };
     reader.readAsDataURL(file);

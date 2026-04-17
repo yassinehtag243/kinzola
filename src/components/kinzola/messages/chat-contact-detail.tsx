@@ -257,7 +257,7 @@ export default function ChatContactDetail() {
                       '0 0 0 0 rgba(74,222,128,0)',
                     ],
                   }}
-                  transition={{ type: 'tween', duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                  transition={{ type: 'tween' as const, duration: 2, repeat: Infinity, ease: 'easeInOut' as const }}
                 />
               )}
             </div>

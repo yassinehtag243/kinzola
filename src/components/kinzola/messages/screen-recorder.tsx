@@ -339,7 +339,7 @@ export default memo(function ScreenRecorder({ onSendVideo, onClose }: ScreenReco
             {/* Icône decorative */}
             <motion.div
               animate={{ boxShadow: ['0 0 0 0 rgba(255, 77, 141, 0)', '0 0 40px 10px rgba(255, 77, 141, 0.15)', '0 0 0 0 rgba(255, 77, 141, 0)'] }}
-              transition={{ type: 'tween', duration: 2.5, repeat: Infinity }}
+              transition={{ type: 'tween' as const, duration: 2.5, repeat: Infinity }}
               className="w-28 h-28 rounded-3xl flex items-center justify-center"
               style={{ background: 'linear-gradient(135deg, rgba(43, 127, 255, 0.15), rgba(255, 77, 141, 0.15))' }}
             >
@@ -449,7 +449,7 @@ export default memo(function ScreenRecorder({ onSendVideo, onClose }: ScreenReco
                   strokeDasharray={`${2 * Math.PI * 82}`}
                   initial={{ strokeDashoffset: 2 * Math.PI * 82 }}
                   animate={{ strokeDashoffset: (2 * Math.PI * 82) * (1 - (recordingTime % 60) / 60) }}
-                  transition={{ duration: 1, ease: 'linear', repeat: Infinity }}
+                  transition={{ duration: 1, ease: 'linear' as const, repeat: Infinity }}
                   transform="rotate(-90 88 88)"
                 />
                 <defs>
@@ -466,7 +466,7 @@ export default memo(function ScreenRecorder({ onSendVideo, onClose }: ScreenReco
                   scale: [1, 1.15, 1],
                   opacity: [0.9, 1, 0.9],
                 }}
-                transition={{ type: 'tween', duration: 1.5, repeat: Infinity }}
+                transition={{ type: 'tween' as const, duration: 1.5, repeat: Infinity }}
                 className="w-20 h-20 rounded-2xl flex items-center justify-center"
                 style={{ background: 'linear-gradient(135deg, #FF4D8D, #FF1744)' }}
               >
@@ -490,7 +490,7 @@ export default memo(function ScreenRecorder({ onSendVideo, onClose }: ScreenReco
               <div className="flex items-center gap-2 justify-center">
                 <motion.div
                   animate={{ opacity: [1, 0.3, 1] }}
-                  transition={{ type: 'tween', duration: 1.2, repeat: Infinity }}
+                  transition={{ type: 'tween' as const, duration: 1.2, repeat: Infinity }}
                   className="w-2 h-2 rounded-full bg-red-500"
                 />
                 <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.6)' }}>

@@ -208,7 +208,7 @@ const MessageBubble = memo(function MessageBubble({
             : isLoading
             ? <motion.div className="w-4 h-4 border-2 border-t-transparent rounded-full"
                 style={{ borderColor: isSent ? 'rgba(255,255,255,0.8)' : receivedTextColor, borderTopColor: 'transparent' }}
-                animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }} />
+                animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' as const }} />
             : hasError
             ? <motion.button
                 onClick={(e) => { e.stopPropagation(); onToggleVoice(msgData.id); }}
@@ -216,7 +216,7 @@ const MessageBubble = memo(function MessageBubble({
                 aria-label="Reessayer la lecture">
                 <motion.div
                   animate={{ rotate: [0, -15, 15, -15, 0] }}
-                  transition={{ duration: 0.5, repeat: 1, ease: 'easeInOut' }}
+                  transition={{ duration: 0.5, repeat: 1, ease: 'easeInOut' as const }}
                 >
                   <span className="text-xs" style={{ color: isSent ? '#fff' : receivedTextColor }}>↻</span>
                 </motion.div>
@@ -1145,7 +1145,7 @@ export default function ChatScreen() {
             {online ? (
               <motion.div className="absolute -bottom-1 -right-1 w-[20px] h-[20px] rounded-full flex items-center justify-center" style={{ background: onlineDotBorder }}
                 animate={{ scale: [1, 1.2, 1], boxShadow: ['0 0 4px rgba(255,45,111,0.3)', '0 0 12px rgba(255,45,111,0.7)', '0 0 4px rgba(255,45,111,0.3)'] }}
-                transition={{ type: 'tween', duration: 2, repeat: Infinity, ease: 'easeInOut' }}>
+                transition={{ type: 'tween' as const, duration: 2, repeat: Infinity, ease: 'easeInOut' as const }}>
                 <span className="text-[13px] leading-none" style={{ filter: 'drop-shadow(0 0 6px rgba(255, 45, 111, 0.9))' }}>❤️</span>
               </motion.div>
             ) : (
@@ -1235,7 +1235,7 @@ export default function ChatScreen() {
                   {TYPING_DELAYS.map((d, i) => (
                     <motion.div key={i}
                       animate={{ y: [0, -6, 0], opacity: [0.4, 1, 0.4] }}
-                      transition={{ type: 'tween', duration: 0.8, repeat: Infinity, delay: d }}
+                      transition={{ type: 'tween' as const, duration: 0.8, repeat: Infinity, delay: d }}
                       className="w-[6px] h-[6px] rounded-full"
                       style={{ background: isLight ? 'rgba(0,0,0,0.2)' : 'rgba(128,128,128,0.5)' }}
                     />
