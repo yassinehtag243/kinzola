@@ -131,3 +131,32 @@ Stage Summary:
 - All image/audio uploads now go through Supabase Storage (kinzola-photos bucket)
 - Instant local preview preserved (FileReader), actual upload on save/send
 - Graceful fallback to base64 if storage upload fails
+
+---
+Task ID: 7
+Agent: main
+Task: Phase 5 - Supabase Realtime (Messages, Conversations, Notifications, Matches, Presence)
+
+Work Log:
+- Added `subscribeToMatches()` in `matches-service.ts` — listens for INSERT on matches table (dual filter for user1_id/user2_id), loads other user's profile on match event
+- Fixed `subscribeToConversations()` in `messages-service.ts` — replaced invalid OR filter with 4 separate `.on()` handlers (participant1 UPDATE, participant2 UPDATE, participant1 INSERT, participant2 INSERT)
+- Added `subscribeToProfilePresence()` in `messages-service.ts` — listens for UPDATE on profiles table, fires only when online/last_seen changes
+- Added `updateOwnPresence()` in `messages-service.ts` — sets online status and last_seen timestamp
+- Created `src/hooks/use-realtime.ts` — central orchestrator hook with 6 useEffect blocks:
+  1. Message subscription (per open conversation, auto-ignores own messages, deduplication)
+  2. Conversation subscription (global, handles INSERT→fetchAllData, UPDATE→local merge)
+  3. Notification subscription (prepends new notifications to store)
+  4. Match subscription (adds new match, triggers fetchAllData, shows match modal)
+  5. Profile presence tracking (updates online/lastSeen across conversations, matches, profiles)
+  6. Heartbeat (30s interval, beforeunload cleanup, visibilitychange handling)
+- Updated `app-shell.tsx` — replaced `startRandomMessages()` with `useRealtime()`, removed unused `useRef` import
+- Updated `lib/supabase/index.ts` — exported `subscribeToMatches`, `subscribeToProfilePresence`, `updateOwnPresence`
+
+Stage Summary:
+- 5 files modified, 1 new file created
+- Build passes: 0 errors (Next.js build)
+- 0 new TypeScript errors in our code (pre-existing TS errors in legacy Prisma API routes unchanged)
+- Realtime replaces fake simulated messages (simulateReply/startRandomMessages are now no-ops)
+- All 5 realtime tables active: messages, conversations, notifications, matches, profiles
+- Heartbeat keeps online status current every 30 seconds
+- Graceful cleanup on unmount/logout/beforeunload

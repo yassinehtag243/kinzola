@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
 import { useAuth } from '@/lib/supabase/auth-context';
@@ -22,6 +22,7 @@ import NotificationSoundManager from './news/notification-sound-manager';
 import MatchNotificationBanner from './match-notification-banner';
 import MessageNotificationBanner from './messages/message-notification-banner';
 import { useBrowserNotifications } from '@/hooks/use-browser-notifications';
+import { useRealtime } from '@/hooks/use-realtime';
 
 // ─── Screen slide transition (left/right like mobile navigation) ───
 const screenVariants = {
@@ -66,7 +67,6 @@ export default function AppShell() {
     textSize,
     hydrate,
     isAuthenticated,
-    startRandomMessages,
     setTab,
     openChat,
     markConversationRead,
@@ -86,6 +86,11 @@ export default function AppShell() {
 
   // Browser push notifications (real phone notifications)
   useBrowserNotifications();
+
+  // ─── Supabase Realtime — Phase 5 ──────────────────────────────────
+  // Abonnements temps réel : messages, conversations, notifications,
+  // matchs, presence (online/offline), heartbeat
+  useRealtime();
 
   // Handle URL params when opening from notification (outside app)
   // SW sends: ?action=reply&conv=xxx&name=xxx or ?action=open-chat&conv=xxx
@@ -211,16 +216,8 @@ export default function AppShell() {
     setMounted(true);
   }, [hydrate]);
 
-  // Start random incoming messages after login (15-60s intervals)
-  const randomMsgStarted = useRef(false);
-  useEffect(() => {
-    if (isAuthenticated && mounted && !randomMsgStarted.current) {
-      randomMsgStarted.current = true;
-      // Start after 10 seconds delay
-      const timer = setTimeout(() => startRandomMessages(), 10000);
-      return () => clearTimeout(timer);
-    }
-  }, [isAuthenticated, mounted, startRandomMessages]);
+  // Realtime remplace les faux messages simulés (Phase 5)
+  // Les messages arrivent maintenant en temps réel via Supabase Realtime
 
   // ✅ Utilise les vraies valeurs uniquement après le premier render client
   const safeTheme = mounted ? theme : SSR_THEME;

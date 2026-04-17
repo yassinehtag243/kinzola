@@ -413,6 +413,10 @@ export function subscribeToMessages(
 /**
  * S'abonner aux mises à jour de conversation en temps réel
  * (dernier message, compteur unread, etc.).
+ *
+ * Note: Le filtre OR n'est pas supporté par Supabase Realtime,
+ * donc on crée deux souscriptions séparées (participant1 et participant2).
+ *
  * @returns Fonction de désabonnement
  */
 export function subscribeToConversations(
@@ -421,13 +425,14 @@ export function subscribeToConversations(
 ): () => void {
   const channel = supabase
     .channel(`conversations:${userId}`)
+    // Participant 1 — UPDATE
     .on(
       'postgres_changes',
       {
         event: 'UPDATE',
         schema: 'public',
         table: 'conversations',
-        filter: `or(participant1_id.eq.${userId},participant2_id.eq.${userId})`,
+        filter: `participant1_id=eq.${userId}`,
       },
       (payload) => {
         callback({
@@ -437,14 +442,48 @@ export function subscribeToConversations(
         });
       }
     )
-    // Écouter aussi les nouvelles conversations (INSERT)
+    // Participant 2 — UPDATE
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'conversations',
+        filter: `participant2_id=eq.${userId}`,
+      },
+      (payload) => {
+        callback({
+          eventType: payload.eventType,
+          new: payload.new as ConversationRow,
+          old: payload.old as ConversationRow,
+        });
+      }
+    )
+    // Participant 1 — INSERT (nouvelle conversation)
     .on(
       'postgres_changes',
       {
         event: 'INSERT',
         schema: 'public',
         table: 'conversations',
-        filter: `or(participant1_id.eq.${userId},participant2_id.eq.${userId})`,
+        filter: `participant1_id=eq.${userId}`,
+      },
+      (payload) => {
+        callback({
+          eventType: payload.eventType,
+          new: payload.new as ConversationRow,
+          old: {} as ConversationRow,
+        });
+      }
+    )
+    // Participant 2 — INSERT
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'conversations',
+        filter: `participant2_id=eq.${userId}`,
       },
       (payload) => {
         callback({
@@ -459,4 +498,81 @@ export function subscribeToConversations(
   return () => {
     supabase.removeChannel(channel);
   };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  REALTIME — Presence (En ligne / Hors ligne)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Callback pour les changements de statut en ligne */
+export type PresenceCallback = (payload: {
+  userId: string;
+  online: boolean;
+  lastSeen: string;
+}) => void;
+
+/**
+ * S'abonner aux changements de statut en ligne des profils.
+ * Écoute les UPDATE sur la table profiles pour les champs online et last_seen.
+ *
+ * ⚠️ On n'applique PAS de filtre sur les user_ids spécifiques car
+ *    Supabase Realtime ne supporte qu'un filtre par .on().
+ *    Le callback reçoit TOUT changement de profil — le consumer doit filtrer.
+ *
+ * @returns Fonction de désabonnement
+ */
+export function subscribeToProfilePresence(
+  callback: PresenceCallback
+): () => void {
+  const channel = supabase
+    .channel('profiles:presence')
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'profiles',
+      },
+      (payload) => {
+        const profile = payload.new as any;
+        const old = payload.old as any;
+        // Ne déclencher QUE si online ou last_seen a changé
+        if (
+          profile.online !== old?.online ||
+          profile.last_seen !== old?.last_seen
+        ) {
+          callback({
+            userId: profile.id,
+            online: profile.online,
+            lastSeen: profile.last_seen,
+          });
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
+/**
+ * Met à jour le statut en ligne de l'utilisateur courant.
+ * Appelé régulièrement (heartbeat) pour maintenir le statut à jour.
+ */
+export async function updateOwnPresence(
+  userId: string,
+  online: boolean
+): Promise<void> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      online,
+      last_seen: new Date().toISOString(),
+    })
+    .eq('id', userId);
+
+  if (error) {
+    console.warn('[Presence] Impossible de mettre à jour le statut:', error.message);
+  }
 }

@@ -454,6 +454,76 @@ export async function unblockUser(
 //  SIGNALEMENTS
 // ═══════════════════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  REALTIME — Abonnement
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Callback Realtime pour les nouveaux matchs */
+export type MatchCallback = (match: MatchWithProfile) => void;
+
+/**
+ * S'abonner aux nouveaux matchs d'un utilisateur en temps réel.
+ * Écoute les INSERT sur la table matches où l'utilisateur est participant.
+ * @returns Fonction de désabonnement
+ */
+export function subscribeToMatches(
+  userId: string,
+  callback: MatchCallback
+): () => void {
+  const channel = supabase
+    .channel(`matches:${userId}`)
+    // Écouter quand user est participant 1
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'matches',
+        filter: `user1_id=eq.${userId}`,
+      },
+      async (payload) => {
+        const matchRow = payload.new as MatchRow;
+        // Charger le profil de l'autre utilisateur
+        const otherUserId = matchRow.user2_id;
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', otherUserId)
+          .single();
+        if (profile) {
+          callback({ ...matchRow, profile });
+        }
+      }
+    )
+    // Écouter quand user est participant 2
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'matches',
+        filter: `user2_id=eq.${userId}`,
+      },
+      async (payload) => {
+        const matchRow = payload.new as MatchRow;
+        const otherUserId = matchRow.user1_id;
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', otherUserId)
+          .single();
+        if (profile) {
+          callback({ ...matchRow, profile });
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
 /**
  * Signaler un utilisateur.
  * Crée un signalement dans la table reports.

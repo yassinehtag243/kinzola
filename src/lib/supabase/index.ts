@@ -30,6 +30,7 @@ export {
   getConversations, getMessages, sendMessage, sendReplyMessage,
   deleteMessageForMe, toggleMessageImportant, markMessagesAsRead,
   deleteConversation, subscribeToMessages, subscribeToConversations,
+  subscribeToProfilePresence, updateOwnPresence,
 } from './messages-service';
 
 // Matches
@@ -37,6 +38,7 @@ export {
   getMatches, getNewMatches, createMatch, markMatchSeen,
   checkMatchExists, likeProfile, superLikeProfile,
   getBlockedUsers, blockUser, unblockUser, reportUser,
+  subscribeToMatches,
 } from './matches-service';
 
 // Posts
