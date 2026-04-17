@@ -2,10 +2,11 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Camera, X, Plus } from 'lucide-react';
+import { ArrowLeft, Camera, X, Plus, Loader2 } from 'lucide-react';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
 import { AVAILABLE_RELIGIONS, AVAILABLE_INTERESTS } from '@/lib/constants';
 import CityInput from '@/components/kinzola/shared/city-input';
+import { updateProfilePhoto, uploadGalleryPhoto } from '@/lib/supabase/storage-service';
 
 export default function EditProfile() {
   const { user, setShowEditProfile, updateProfile } = useKinzolaStore();
@@ -29,6 +30,13 @@ export default function EditProfile() {
 
   // Local gallery state (synced with user.photoGallery)
   const [localGallery, setLocalGallery] = useState<string[]>(user?.photoGallery || []);
+
+  // Pending files for Supabase upload
+  const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState(user?.photoUrl || '');
+  const [pendingGalleryFiles, setPendingGalleryFiles] = useState<File[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -64,15 +72,19 @@ export default function EditProfile() {
     const file = e.target.files?.[0];
     if (!file || !file.type.startsWith('image/')) return;
 
+    // Store the File for later upload to Supabase
+    setPendingAvatarFile(file);
+
+    // Keep FileReader for instant local preview
     const reader = new FileReader();
     reader.onload = (ev) => {
       if (ev.target?.result) {
-        updateProfile({ photoUrl: ev.target.result as string });
+        setAvatarPreview(ev.target.result as string);
       }
     };
     reader.readAsDataURL(file);
     e.target.value = '';
-  }, [updateProfile]);
+  }, []);
 
   // ─── Gallery file handler ───
   const handleGalleryFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -80,11 +92,14 @@ export default function EditProfile() {
     if (!file || !file.type.startsWith('image/')) return;
     if (localGallery.length >= 5) return;
 
+    // Store the File for later upload to Supabase
+    setPendingGalleryFiles(prev => [...prev, file]);
+
+    // Keep FileReader for instant local preview
     const reader = new FileReader();
     reader.onload = (ev) => {
       if (ev.target?.result) {
-        const newGallery = [...localGallery, ev.target.result as string];
-        setLocalGallery(newGallery);
+        setLocalGallery(prev => [...prev, ev.target.result as string]);
       }
     };
     reader.readAsDataURL(file);
@@ -93,29 +108,89 @@ export default function EditProfile() {
 
   // ─── Remove gallery photo ───
   const handleRemoveGalleryPhoto = useCallback((index: number) => {
-    setLocalGallery(prev => prev.filter((_, idx) => idx !== index));
+    setLocalGallery(prev => {
+      const removedUrl = prev[index];
+      const newGallery = prev.filter((_, idx) => idx !== index);
+
+      // If removed a new photo (data URL), also remove from pendingGalleryFiles
+      if (removedUrl.startsWith('data:')) {
+        let dataIndex = 0;
+        for (let i = 0; i < index; i++) {
+          if (prev[i].startsWith('data:')) dataIndex++;
+        }
+        setPendingGalleryFiles(pf => pf.filter((_, fi) => fi !== dataIndex));
+      }
+
+      return newGallery;
+    });
   }, []);
 
-  const handleSave = () => {
-    updateProfile({
-      name: form.name,
-      pseudo: form.pseudo,
-      age: parseInt(form.age) || user?.age || 25,
-      gender: form.gender as 'homme' | 'femme',
-      city: form.city,
-      profession: form.profession,
-      religion: form.religion,
-      bio: form.bio,
-      interests: form.interests,
-      photoGallery: localGallery,
-      lookingFor: form.lookingFor,
-      height: parseInt(form.height) || undefined,
-      education: form.education,
-      languages: form.languages,
-      relationshipStatus: form.relationshipStatus,
-      lifestyle: form.lifestyle,
-    });
-    setShowEditProfile(false);
+  const handleSave = async () => {
+    if (!user?.id) return;
+    setSaving(true);
+    setUploadError(null);
+
+    try {
+      // Upload avatar if changed
+      let finalPhotoUrl = user.photoUrl;
+      if (pendingAvatarFile) {
+        const avatarResult = await updateProfilePhoto(user.id, pendingAvatarFile);
+        if (avatarResult.error) {
+          setUploadError(avatarResult.error);
+          setSaving(false);
+          return;
+        }
+        if (avatarResult.url) {
+          finalPhotoUrl = avatarResult.url;
+        }
+      }
+
+      // Upload gallery photos if any new ones
+      // Keep existing URLs (those starting with "http") and upload new files
+      const existingGalleryUrls = localGallery.filter(url => url.startsWith('http'));
+      const finalGallery = [...existingGalleryUrls];
+
+      if (pendingGalleryFiles.length > 0) {
+        for (let i = 0; i < pendingGalleryFiles.length; i++) {
+          const result = await uploadGalleryPhoto(user.id, pendingGalleryFiles[i], finalGallery.length + i);
+          if (result.url) {
+            finalGallery.push(result.url);
+          }
+          if (result.error) {
+            console.error(`Gallery photo ${i + 1} upload failed:`, result.error);
+          }
+        }
+      }
+
+      // Update profile with storage URLs (not base64)
+      updateProfile({
+        name: form.name,
+        pseudo: form.pseudo,
+        age: parseInt(form.age) || user?.age || 25,
+        gender: form.gender as 'homme' | 'femme',
+        city: form.city,
+        profession: form.profession,
+        religion: form.religion,
+        bio: form.bio,
+        interests: form.interests,
+        photoUrl: finalPhotoUrl,
+        photoGallery: finalGallery,
+        lookingFor: form.lookingFor,
+        height: parseInt(form.height) || undefined,
+        education: form.education,
+        languages: form.languages,
+        relationshipStatus: form.relationshipStatus,
+        lifestyle: form.lifestyle,
+      });
+
+      setPendingAvatarFile(null);
+      setPendingGalleryFiles([]);
+      setShowEditProfile(false);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Erreur lors de la sauvegarde');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const inputClass = 'w-full h-12 px-4 rounded-xl glass bg-white/5 text-white text-sm focus:outline-none transition-all';
@@ -170,14 +245,35 @@ export default function EditProfile() {
           <h3 className="text-lg font-bold">Modifier le profil</h3>
           <button
             onClick={handleSave}
-            className="px-4 py-1.5 rounded-full text-white text-sm font-semibold"
+            disabled={saving}
+            className="px-4 py-1.5 rounded-full text-white text-sm font-semibold flex items-center gap-2 transition-all disabled:opacity-60"
             style={{
               background: 'linear-gradient(135deg, #2B7FFF, #FF4D8D)',
             }}
           >
-            Enregistrer
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+            {saving ? 'Enregistrement...' : 'Enregistrer'}
           </button>
         </div>
+
+        {/* Upload error toast */}
+        <AnimatePresence>
+          {uploadError && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mx-5 mt-1 px-4 py-2.5 rounded-xl text-xs text-red-300 flex items-center gap-2"
+              style={{ background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+            >
+              <span>⚠️</span>
+              <span className="flex-1">{uploadError}</span>
+              <button onClick={() => setUploadError(null)} className="text-red-300 hover:text-red-200">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Centered avatar with camera overlay */}
         <div className="flex justify-center py-4">
@@ -185,6 +281,7 @@ export default function EditProfile() {
             <button
               onClick={() => avatarInputRef.current?.click()}
               className="cursor-pointer"
+              disabled={saving}
             >
               <div
                 className="w-24 h-24 rounded-full p-[3px]"
@@ -193,11 +290,17 @@ export default function EditProfile() {
                 }}
               >
                 <img
-                  src={user?.photoUrl || ''}
+                  src={avatarPreview || ''}
                   alt="Profile"
                   className="w-full h-full rounded-full object-cover"
                   style={{ border: '3px solid #060E1A' }}
                 />
+                {/* Uploading overlay */}
+                {saving && pendingAvatarFile && (
+                  <div className="absolute inset-[3px] rounded-full bg-black/50 flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 text-white animate-spin" />
+                  </div>
+                )}
               </div>
             </button>
             <button
@@ -227,12 +330,18 @@ export default function EditProfile() {
               <h4 className="text-[11px] font-semibold text-kinzola-muted uppercase tracking-wider">
                 Photos ({localGallery.length}/5)
               </h4>
+              {saving && pendingGalleryFiles.length > 0 && (
+                <span className="text-[10px] text-kinzola-blue flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Upload...
+                </span>
+              )}
             </div>
             <div className="grid grid-cols-3 gap-2">
               <AnimatePresence mode="popLayout">
                 {localGallery.map((photo, i) => (
                   <motion.div
-                    key={`gallery-${photo}-${i}`}
+                    key={`gallery-${photo.substring(0, 50)}-${i}`}
                     layout
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -245,6 +354,12 @@ export default function EditProfile() {
                       alt={`Photo ${i + 1}`}
                       className="w-full h-full object-cover"
                     />
+                    {/* Upload overlay for new photos during save */}
+                    {saving && photo.startsWith('data:') && (
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                        <Loader2 className="w-5 h-5 text-white animate-spin" />
+                      </div>
+                    )}
                     <button
                       onClick={() => handleRemoveGalleryPhoto(i)}
                       className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
@@ -263,7 +378,8 @@ export default function EditProfile() {
                   animate={{ opacity: 1, scale: 1 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => galleryInputRef.current?.click()}
-                  className="aspect-square rounded-xl flex flex-col items-center justify-center gap-1 cursor-pointer"
+                  disabled={saving}
+                  className="aspect-square rounded-xl flex flex-col items-center justify-center gap-1 cursor-pointer disabled:opacity-40"
                   style={{
                     border: '2px dashed rgba(255, 255, 255, 0.15)',
                     background: 'rgba(255, 255, 255, 0.03)',

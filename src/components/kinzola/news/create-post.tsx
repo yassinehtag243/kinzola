@@ -4,15 +4,18 @@ import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, X, Image as ImageIcon, Clock, Check } from 'lucide-react';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
+import { uploadPostImage } from '@/lib/supabase/storage-service';
 
 export default function CreatePost() {
-  const { setShowNewPost, createPost } = useKinzolaStore();
+  const { user, setShowNewPost, createPost } = useKinzolaStore();
   const [content, setContent] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [imageSize, setImageSize] = useState<string>('');
+  const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
   const [isPublic, setIsPublic] = useState(true);
   const [isPublishing, setIsPublishing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -26,6 +29,7 @@ export default function CreatePost() {
     // Validate file size (max 15MB)
     if (file.size > 15 * 1024 * 1024) {
       setImageUrl('');
+      setPendingImageFile(null);
       setImageSize('Fichier trop volumineux (max 15MB)');
       return;
     }
@@ -39,7 +43,11 @@ export default function CreatePost() {
       setImageSize(`${Math.round(sizeKB)} Ko`);
     }
 
-    // Convert to base64 via FileReader
+    // Store the File object for Supabase upload
+    setPendingImageFile(file);
+    setUploadError(null);
+
+    // Keep FileReader for instant local preview
     const reader = new FileReader();
     reader.onload = (ev) => {
       if (ev.target?.result) {
@@ -50,16 +58,35 @@ export default function CreatePost() {
     e.target.value = '';
   };
 
-  const handlePublish = () => {
+  const handlePublish = async () => {
     if (!content.trim() && !imageUrl.trim()) return;
     setIsPublishing(true);
+    setUploadError(null);
 
-    // Simulate brief publishing delay for visual feedback
-    setTimeout(() => {
-      createPost(content, imageUrl || undefined, isPublic ? 'public' : 'friends');
+    try {
+      let finalImageUrl: string | undefined = undefined;
+
+      // Upload image to Supabase Storage if a new file was selected
+      if (pendingImageFile && user?.id) {
+        const uploadResult = await uploadPostImage(user.id, pendingImageFile);
+        if (uploadResult.error || !uploadResult.url) {
+          console.error('[Post] Image upload failed:', uploadResult.error);
+          setUploadError('Erreur lors de l\'envoi de l\'image. Veuillez réessayer.');
+          setIsPublishing(false);
+          return;
+        }
+        finalImageUrl = uploadResult.url;
+        console.log('[Post] Image uploaded to:', finalImageUrl);
+      } else if (imageUrl && !pendingImageFile) {
+        // No new file — keep existing URL (shouldn't happen normally)
+        finalImageUrl = imageUrl;
+      }
+
+      createPost(content, finalImageUrl, isPublic ? 'public' : 'friends');
       setContent('');
       setImageUrl('');
       setImageSize('');
+      setPendingImageFile(null);
       setIsPublic(true);
       setIsPublishing(false);
       setShowSuccess(true);
@@ -68,7 +95,11 @@ export default function CreatePost() {
       setTimeout(() => {
         setShowNewPost(false);
       }, 600);
-    }, 400);
+    } catch (err) {
+      console.error('[Post] Publish failed:', err);
+      setUploadError(err instanceof Error ? err.message : 'Erreur lors de la publication');
+      setIsPublishing(false);
+    }
   };
 
   return (
@@ -148,6 +179,25 @@ export default function CreatePost() {
           </AnimatePresence>
         </div>
 
+        {/* Upload error toast */}
+        <AnimatePresence>
+          {uploadError && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mx-5 mt-1 px-4 py-2.5 rounded-xl text-xs text-red-300 flex items-center gap-2"
+              style={{ background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+            >
+              <span>⚠️</span>
+              <span className="flex-1">{uploadError}</span>
+              <button onClick={() => setUploadError(null)} className="text-red-300 hover:text-red-200">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Content */}
         <div className="flex-1 p-5 space-y-4 overflow-y-auto">
           <textarea
@@ -169,12 +219,24 @@ export default function CreatePost() {
               className="relative rounded-xl overflow-hidden"
             >
               <img src={imageUrl} alt="Preview" className="w-full h-48 object-cover" />
-              <button
-                onClick={() => { setImageUrl(''); setImageSize(''); }}
-                className="absolute top-2 right-2 w-8 h-8 rounded-full glass flex items-center justify-center"
-              >
-                <X className="w-4 h-4 text-white" />
-              </button>
+              {/* Upload overlay during publishing */}
+              {isPublishing && pendingImageFile && (
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                  <motion.span
+                    animate={{ rotate: 360 }}
+                    transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
+                    className="inline-block w-8 h-8 border-3 border-white/30 border-t-white rounded-full"
+                  />
+                </div>
+              )}
+              {!isPublishing && (
+                <button
+                  onClick={() => { setImageUrl(''); setImageSize(''); setPendingImageFile(null); }}
+                  className="absolute top-2 right-2 w-8 h-8 rounded-full glass flex items-center justify-center"
+                >
+                  <X className="w-4 h-4 text-white" />
+                </button>
+              )}
               {imageSize && !imageSize.startsWith('Fichier') && (
                 <div className="absolute bottom-2 left-2 glass px-2 py-1 rounded-full">
                   <span className="text-[10px] text-white/80">{imageSize}</span>

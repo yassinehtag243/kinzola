@@ -1342,7 +1342,7 @@ export default function ChatScreen() {
       </AnimatePresence>
 
       {/* ─── Input bar ─── */}
-      {!isUserBlocked && <ChatInputBar onSendMessage={handleSendMessage} onSendVoice={handleSendVoice} onSendImage={handleSendImage} />}
+      {!isUserBlocked && <ChatInputBar conversationId={conversationId} onSendMessage={handleSendMessage} onSendVoice={handleSendVoice} onSendImage={handleSendImage} />}
 
       {/* ─── Chat Contact Detail Overlay ─── */}
       <AnimatePresence>

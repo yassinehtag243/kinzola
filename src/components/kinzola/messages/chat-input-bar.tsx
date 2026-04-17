@@ -6,17 +6,19 @@ import { Smile, Mic, Send, Camera, Trash2, Loader2, MicOff } from 'lucide-react'
 import { usePermission, PermissionModal, PermissionDeniedBanner, PermissionToast } from './permission-manager';
 import dynamic from 'next/dynamic';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
+import { uploadMessageImage, uploadMessageAudio } from '@/lib/supabase/storage-service';
 
 const EmojiPickerReact = dynamic(() => import('./emoji-picker-react'), { ssr: false });
 
 interface ChatInputBarProps {
+  conversationId: string;
   onSendMessage: (text: string) => void;
-  onSendVoice: (content: string) => void; // format: "duration|dataUrl"
-  onSendImage: (base64DataUrl: string) => void;
+  onSendVoice: (content: string) => void; // format: "duration|url"
+  onSendImage: (imageUrl: string) => void;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  Utility: Convert blob to data URL
+//  Utility: Convert blob to data URL (kept for validation only)
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
@@ -53,7 +55,8 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   });
 }
 
-export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendImage }: ChatInputBarProps) {
+export default memo(function ChatInputBar({ conversationId, onSendMessage, onSendVoice, onSendImage }: ChatInputBarProps) {
+  const user = useKinzolaStore((s) => s.user);
   const pendingNotificationReply = useKinzolaStore((s) => s.pendingNotificationReply);
   const setPendingNotificationReply = useKinzolaStore((s) => s.setPendingNotificationReply);
   const [message, setMessage] = useState('');
@@ -78,6 +81,7 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
   // Image preview
   const [pendingImage, setPendingImage] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const pendingUrlRef = useRef<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -105,9 +109,11 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
   const onSendMessageRef = useRef(onSendMessage);
   const onSendVoiceRef = useRef(onSendVoice);
   const onSendImageRef = useRef(onSendImage);
+  const conversationIdRef = useRef(conversationId);
   useEffect(() => { onSendMessageRef.current = onSendMessage; }, [onSendMessage]);
   useEffect(() => { onSendVoiceRef.current = onSendVoice; }, [onSendVoice]);
   useEffect(() => { onSendImageRef.current = onSendImage; }, [onSendImage]);
+  useEffect(() => { conversationIdRef.current = conversationId; }, [conversationId]);
 
   const isRecordingRef = useRef(false);
   const recordingTimeRef = useRef(0);
@@ -391,16 +397,30 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
       }
 
       try {
-        const dataUrl = await blobToDataUrl(blob);
+        // Upload audio to Supabase Storage instead of sending base64 data URL
+        const convId = conversationIdRef.current;
+        const uploadResult = await uploadMessageAudio(convId, blob, recorder.mimeType || 'audio/webm');
 
-        const mins = Math.floor(elapsed / 60);
-        const secs = elapsed % 60;
-        const duration = `${mins}:${secs.toString().padStart(2, '0')}`;
-        const content = `${duration}|${dataUrl}`;
-        console.log('[Voice] Sending voice, duration:', duration, 'dataUrl length:', dataUrl.length);
-        onSendVoiceRef.current(content);
+        if (uploadResult.error || !uploadResult.url) {
+          console.error('[Voice] Upload failed:', uploadResult.error);
+          // Fallback: use data URL if upload fails
+          const dataUrl = await blobToDataUrl(blob);
+          const mins = Math.floor(elapsed / 60);
+          const secs = elapsed % 60;
+          const duration = `${mins}:${secs.toString().padStart(2, '0')}`;
+          const content = `${duration}|${dataUrl}`;
+          onSendVoiceRef.current(content);
+        } else {
+          // Success: send with storage URL
+          const mins = Math.floor(elapsed / 60);
+          const secs = elapsed % 60;
+          const duration = `${mins}:${secs.toString().padStart(2, '0')}`;
+          const content = `${duration}|${uploadResult.url}`;
+          console.log('[Voice] Sent via Supabase Storage, duration:', duration, 'url:', uploadResult.url);
+          onSendVoiceRef.current(content);
+        }
       } catch (err) {
-        console.error('[Voice] Data URL conversion failed:', err);
+        console.error('[Voice] Send failed:', err);
       } finally {
         setIsProcessing(false);
         setRecordingTime(0);
@@ -496,17 +516,37 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
   }, []);
 
   const handleConfirmSendImage = useCallback(async () => {
-    if (pendingImage) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (reader.result) onSendImageRef.current(reader.result as string);
-      };
-      reader.readAsDataURL(pendingImage);
+    if (!pendingImage) return;
+    setUploadingImage(true);
+
+    try {
+      // Upload to Supabase Storage first
+      const convId = conversationIdRef.current;
+      const userId = user?.id || 'anonymous';
+      const uploadResult = await uploadMessageImage(userId, convId, pendingImage);
+
+      if (uploadResult.error || !uploadResult.url) {
+        console.error('[Image] Upload failed:', uploadResult.error);
+        // Fallback: send as base64 if upload fails
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (reader.result) onSendImageRef.current(reader.result as string);
+        };
+        reader.readAsDataURL(pendingImage);
+      } else {
+        // Success: send with storage URL
+        console.log('[Image] Sent via Supabase Storage, url:', uploadResult.url);
+        onSendImageRef.current(uploadResult.url);
+      }
+    } catch (err) {
+      console.error('[Image] Send failed:', err);
+    } finally {
       if (pendingUrlRef.current) { URL.revokeObjectURL(pendingUrlRef.current); pendingUrlRef.current = null; }
       setImagePreviewUrl(null);
       setPendingImage(null);
+      setUploadingImage(false);
     }
-  }, [pendingImage]);
+  }, [pendingImage, user]);
 
   const handleRemovePendingImage = useCallback(() => {
     if (pendingUrlRef.current) { URL.revokeObjectURL(pendingUrlRef.current); pendingUrlRef.current = null; }
@@ -554,11 +594,22 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
               <img src={imagePreviewUrl} alt="Apercu" className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{pendingImage.name}</p>
-                <p className="text-xs text-kinzola-muted">{(pendingImage.size / 1024).toFixed(0)} Ko</p>
+                <p className="text-xs text-kinzola-muted">
+                  {uploadingImage ? (
+                    <span className="text-kinzola-blue flex items-center gap-1">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Envoi en cours...
+                    </span>
+                  ) : (
+                    `${(pendingImage.size / 1024).toFixed(0)} Ko`
+                  )}
+                </p>
               </div>
-              <button onClick={handleRemovePendingImage} className="w-8 h-8 rounded-full glass flex items-center justify-center cursor-pointer">
-                <span className="text-kinzola-muted text-sm">✕</span>
-              </button>
+              {!uploadingImage && (
+                <button onClick={handleRemovePendingImage} className="w-8 h-8 rounded-full glass flex items-center justify-center cursor-pointer">
+                  <span className="text-kinzola-muted text-sm">✕</span>
+                </button>
+              )}
             </div>
           </motion.div>
         )}
@@ -797,19 +848,28 @@ export default memo(function ChatInputBar({ onSendMessage, onSendVoice, onSendIm
                   <Camera className={`w-[20px] h-[20px] transition-colors duration-300 ${showPhotoMenu ? 'text-kinzola-pink' : 'text-kinzola-muted'}`} />
                 </button>
 
-                {/* Mic / Send button */}
+                {/* Mic / Send / Uploading Image button */}
                 {pendingImage ? (
-                  <motion.button
-                    key="send-img"
-                    initial={{ scale: 0, rotate: -45 }}
-                    animate={{ scale: 1, rotate: 0 }}
-                    whileTap={{ scale: 0.85 }}
-                    onClick={handleConfirmSendImage}
-                    className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer"
-                    style={{ background: 'linear-gradient(135deg, #2B7FFF, #FF4D8D)', boxShadow: '0 0 20px rgba(43, 127, 255, 0.4)' }}
-                  >
-                    <Send className="w-5 h-5 text-white" />
-                  </motion.button>
+                  uploadingImage ? (
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ background: 'linear-gradient(135deg, #2B7FFF, #FF4D8D)', boxShadow: '0 0 20px rgba(43, 127, 255, 0.4)' }}
+                    >
+                      <Loader2 className="w-5 h-5 text-white animate-spin" />
+                    </div>
+                  ) : (
+                    <motion.button
+                      key="send-img"
+                      initial={{ scale: 0, rotate: -45 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      whileTap={{ scale: 0.85 }}
+                      onClick={handleConfirmSendImage}
+                      className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer"
+                      style={{ background: 'linear-gradient(135deg, #2B7FFF, #FF4D8D)', boxShadow: '0 0 20px rgba(43, 127, 255, 0.4)' }}
+                    >
+                      <Send className="w-5 h-5 text-white" />
+                    </motion.button>
+                  )
                 ) : (
                   <div className="w-11 h-11 rounded-full flex-shrink-0 relative">
                     {/* Mic button — visible when input empty */}
