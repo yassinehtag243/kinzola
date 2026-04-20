@@ -726,6 +726,7 @@ export default function ChatScreen() {
   const simulateReply = useKinzolaStore((s) => s.simulateReply);
   const unblockUser = useKinzolaStore((s) => s.unblockUser);
   const storeStories = useKinzolaStore((s) => s.stories);
+  const user = useKinzolaStore((s) => s.user);
 
   // ─── Local state ───
   const [showMenu, setShowMenu] = useState(false);
@@ -785,7 +786,7 @@ export default function ChatScreen() {
   useEffect(() => {
     if (!lastMsgId) return;
     const lastMsg = messages[messages.length - 1];
-    if (!lastMsg || lastMsg.senderId !== 'user-me') return;
+    if (!lastMsg || lastMsg.senderId !== user?.id) return;
     let cancelled = false;
     const start = setTimeout(() => { if (!cancelled) setShowTyping(true); }, 300);
     const stop = setTimeout(() => { if (!cancelled) setShowTyping(false); }, 2500);
@@ -1200,11 +1201,11 @@ export default function ChatScreen() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.25 }}
-              className={`flex ${msg.senderId === 'user-me' ? 'justify-end' : 'justify-start'} mb-2.5`}
+              className={`flex ${msg.senderId === user?.id ? 'justify-end' : 'justify-start'} mb-2.5`}
             >
               <MessageBubble
                 msg={msg}
-                isSent={msg.senderId === 'user-me'}
+                isSent={msg.senderId === user?.id}
                 isLight={isLight}
                 online={online}
                 voicePlayback={voicePlayback}
@@ -1216,7 +1217,7 @@ export default function ChatScreen() {
                 dividerColor={dividerColor}
                 reaction={messageReactions[msg.id]}
                 isBlurred={isUserBlocked || (actionMessage !== null && actionMessage.message.id !== msg.id)}
-                onLongPress={() => handleMessageLongPress(msg, msg.senderId === 'user-me')}
+                onLongPress={() => handleMessageLongPress(msg, msg.senderId === user?.id)}
                 onSwipeStart={handleSwipeStart}
                 onSwipeEnd={handleSwipeEnd}
                 onPreviewImage={setPreviewImage}
