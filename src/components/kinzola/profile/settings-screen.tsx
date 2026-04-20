@@ -562,7 +562,9 @@ function BadgeVerificationModal({ onClose, onToast }: { onClose: () => void; onT
   const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
   const [resultType, setResultType] = useState<'success' | 'fail'>('success');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileGalleryRef = useRef<HTMLInputElement>(null);
   const selfieInputRef = useRef<HTMLInputElement>(null);
+  const selfieGalleryRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -763,32 +765,55 @@ function BadgeVerificationModal({ onClose, onToast }: { onClose: () => void; onT
                 onChange={handleFileSelect}
                 className="hidden"
               />
+              <input
+                ref={fileGalleryRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
 
               {idPreview ? (
                 <div className="relative rounded-2xl overflow-hidden">
                   <img src={idPreview} alt="Pièce d'identité" className="w-full h-48 object-cover" />
                   <button
-                    onClick={() => { setIdPreview(null); fileInputRef.current?.click(); }}
+                    onClick={() => { setIdPreview(null); }}
                     className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center cursor-pointer"
                   >
                     <X className="w-4 h-4 text-white" />
                   </button>
+                  <div className="absolute bottom-2 left-2 px-3 py-1 rounded-full" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)' }}>
+                    <span className="text-[11px] text-white">Pièce d'identité</span>
+                  </div>
                 </div>
               ) : (
-                <motion.button
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full h-48 rounded-2xl flex flex-col items-center justify-center gap-3 cursor-pointer"
-                  style={{
-                    border: `2px dashed ${isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'}`,
-                    background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
-                  }}
-                >
-                  <Camera className={`w-10 h-10 ${isLight ? 'text-gray-300' : 'text-white/20'}`} />
-                  <span className={`text-sm ${isLight ? 'text-gray-400' : 'text-kinzola-muted'}`}>
-                    Appuyez pour photographier votre pièce d'identité
-                  </span>
-                </motion.button>
+                <div className="w-full rounded-2xl overflow-hidden" style={{ border: `2px dashed ${isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'}`, background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)' }}>
+                  <div className="flex flex-col items-center justify-center py-8 gap-3">
+                    <Camera className={`w-10 h-10 ${isLight ? 'text-gray-300' : 'text-white/20'}`} />
+                    <span className={`text-sm ${isLight ? 'text-gray-400' : 'text-kinzola-muted'}`}>
+                      Ajouter votre pièce d'identité
+                    </span>
+                  </div>
+                  <div className="flex">
+                    <motion.button
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex-1 flex items-center justify-center gap-2 py-3.5 cursor-pointer transition-colors"
+                      style={{ background: 'rgba(43, 127, 255, 0.08)', borderRight: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)'}` }}
+                    >
+                      <Camera className={`w-4 h-4 ${isLight ? 'text-gray-500' : 'text-white/50'}`} />
+                      <span className={`text-xs font-medium ${isLight ? 'text-gray-600' : 'text-white/60'}`}>Appareil photo</span>
+                    </motion.button>
+                    <motion.button
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => fileGalleryRef.current?.click()}
+                      className="flex-1 flex items-center justify-center gap-2 py-3.5 cursor-pointer transition-colors"
+                    >
+                      <Image className={`w-4 h-4 ${isLight ? 'text-gray-500' : 'text-white/50'}`} />
+                      <span className={`text-xs font-medium ${isLight ? 'text-gray-600' : 'text-white/60'}`}>Galerie</span>
+                    </motion.button>
+                  </div>
+                </div>
               )}
 
               <motion.button
@@ -831,40 +856,60 @@ function BadgeVerificationModal({ onClose, onToast }: { onClose: () => void; onT
                 onChange={handleSelfieSelect}
                 className="hidden"
               />
+              <input
+                ref={selfieGalleryRef}
+                type="file"
+                accept="image/*"
+                onChange={handleSelfieSelect}
+                className="hidden"
+              />
 
               {selfiePreview ? (
                 <div className="relative rounded-2xl overflow-hidden">
                   <img src={selfiePreview} alt="Selfie" className="w-full h-48 object-cover" />
                   <div className="absolute bottom-2 left-2 px-3 py-1 rounded-full" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)' }}>
-                    <span className="text-[11px] text-white">🤳 Selfie</span>
+                    <span className="text-[11px] text-white">Selfie</span>
                   </div>
                   <button
-                    onClick={() => { setSelfiePreview(null); selfieInputRef.current?.click(); }}
+                    onClick={() => { setSelfiePreview(null); }}
                     className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center cursor-pointer"
                   >
                     <X className="w-4 h-4 text-white" />
                   </button>
                 </div>
               ) : (
-                <motion.button
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => selfieInputRef.current?.click()}
-                  className="w-full h-48 rounded-2xl flex flex-col items-center justify-center gap-3 cursor-pointer"
-                  style={{
-                    border: `2px dashed ${isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'}`,
-                    background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)',
-                  }}
-                >
-                  <motion.div
-                    animate={{ scale: [1, 1.1, 1] }}
-                    transition={{ type: 'tween' as const, duration: 1.5, repeat: Infinity }}
-                  >
-                    <Camera className={`w-10 h-10 ${isLight ? 'text-gray-300' : 'text-white/20'}`} />
-                  </motion.div>
-                  <span className={`text-sm ${isLight ? 'text-gray-400' : 'text-kinzola-muted'}`}>
-                    Appuyez pour prendre un selfie
-                  </span>
-                </motion.button>
+                <div className="w-full rounded-2xl overflow-hidden" style={{ border: `2px dashed ${isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'}`, background: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)' }}>
+                  <div className="flex flex-col items-center justify-center py-8 gap-3">
+                    <motion.div
+                      animate={{ scale: [1, 1.1, 1] }}
+                      transition={{ type: 'tween' as const, duration: 1.5, repeat: Infinity }}
+                    >
+                      <Camera className={`w-10 h-10 ${isLight ? 'text-gray-300' : 'text-white/20'}`} />
+                    </motion.div>
+                    <span className={`text-sm ${isLight ? 'text-gray-400' : 'text-kinzola-muted'}`}>
+                      Ajouter votre selfie
+                    </span>
+                  </div>
+                  <div className="flex">
+                    <motion.button
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => selfieInputRef.current?.click()}
+                      className="flex-1 flex items-center justify-center gap-2 py-3.5 cursor-pointer transition-colors"
+                      style={{ background: 'rgba(43, 127, 255, 0.08)', borderRight: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)'}` }}
+                    >
+                      <Camera className={`w-4 h-4 ${isLight ? 'text-gray-500' : 'text-white/50'}`} />
+                      <span className={`text-xs font-medium ${isLight ? 'text-gray-600' : 'text-white/60'}`}>Selfie</span>
+                    </motion.button>
+                    <motion.button
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => selfieGalleryRef.current?.click()}
+                      className="flex-1 flex items-center justify-center gap-2 py-3.5 cursor-pointer transition-colors"
+                    >
+                      <Image className={`w-4 h-4 ${isLight ? 'text-gray-500' : 'text-white/50'}`} />
+                      <span className={`text-xs font-medium ${isLight ? 'text-gray-600' : 'text-white/60'}`}>Galerie</span>
+                    </motion.button>
+                  </div>
+                </div>
               )}
 
               <motion.button
@@ -1458,9 +1503,19 @@ function AccountSwitcherModal({ onClose, onToast, onSwitchAccount, showLogout = 
 
   const handleAddAccount = () => {
     onClose();
-    // Navigation simple vers la page de connexion sans détruire la session actuelle
-    // Le login remplacera naturellement la session Supabase par le nouveau compte
-    useKinzolaStore.setState({ currentScreen: 'login' });
+    // Nettoyer les données de l'utilisateur courant avant de naviguer vers login
+    useKinzolaStore.setState({
+      currentScreen: 'login',
+      conversations: [],
+      matches: [],
+      messages: [],
+      profiles: [],
+      posts: [],
+      notifications: [],
+      likesReceived: [],
+      profileVisitors: [],
+      _fetchingAll: false,
+    });
   };
 
   return (
@@ -1715,11 +1770,22 @@ export default function SettingsScreen() {
 
   // Handle switch to another account
   const handleSwitchAccount = useCallback((targetEmail: string) => {
-    // Pré-remplir l'email pour le login sans détruire la session actuelle
+    // Pré-remplir l'email pour le login + nettoyer les données
     if (typeof window !== 'undefined') {
       localStorage.setItem('kinzola-switch-to-account', targetEmail);
     }
-    useKinzolaStore.setState({ currentScreen: 'login' });
+    useKinzolaStore.setState({
+      currentScreen: 'login',
+      conversations: [],
+      matches: [],
+      messages: [],
+      profiles: [],
+      posts: [],
+      notifications: [],
+      likesReceived: [],
+      profileVisitors: [],
+      _fetchingAll: false,
+    });
     showToast(`Connectez-vous à ${targetEmail}`, 'info');
   }, [showToast]);
 

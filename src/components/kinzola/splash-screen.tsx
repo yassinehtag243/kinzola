@@ -160,7 +160,6 @@ export default function SplashScreen() {
               animate={{ opacity: 1 }}
               transition={{ duration: 0.6 }}
               onClick={handleStart}
-              onTouchStart={handleStart}
               className="absolute inset-0 flex flex-col items-center justify-center z-10 cursor-pointer active:scale-[0.98] transition-transform"
               style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}
             >

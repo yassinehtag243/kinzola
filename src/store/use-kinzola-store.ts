@@ -60,9 +60,6 @@ import {
   dbNotificationToNotification,
   dbMatchToMatch,
   userProfileToDbUpdate,
-} from '@/lib/supabase/adapter';
-
-import {
   dbPostToPost,
   dbCommentToComment,
 } from '@/lib/supabase/adapter';
@@ -252,6 +249,7 @@ interface KinzolaState {
 
   // Async states
   loading: boolean;
+  _fetchingAll: boolean;
   error: string | null;
 
   // Actions - Navigation
@@ -325,7 +323,7 @@ interface KinzolaState {
   unblockUser: (userId: string) => void;
   muteConversation: (conversationId: string) => void;
   unmuteConversation: (conversationId: string) => void;
-  markConversationRead: (conversationId: string) => void;
+  markConversationRead: (conversationId: string) => Promise<void>;
   setPendingNotificationReply: (data: { conversationId: string; participantName: string } | null) => void;
   reportUser: (targetUserId: string, reason: string) => void;
   markAllNotificationsRead: () => void;

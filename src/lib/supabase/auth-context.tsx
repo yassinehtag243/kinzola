@@ -150,9 +150,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!result.error && result.user) {
       setUser(result.user);
       setSession(result.session);
-      // Naviguer immédiatement vers main + charger les données en arrière-plan
-      useKinzolaStore.setState({ isAuthenticated: true, currentScreen: 'main', loading: false, error: null });
-      fetchProfile(result.user.id);  // fire-and-forget — ne bloque pas le retour
+      // Naviguer immédiatement vers main avec les infos basiques du user
+      // Le profil complet sera remplacé par fetchProfile + app-shell sync
+      useKinzolaStore.setState({
+        isAuthenticated: true,
+        currentScreen: 'main',
+        loading: false,
+        error: null,
+        user: {
+          id: result.user.id,
+          email: result.user.email || '',
+          phone: '',
+          name: result.user.user_metadata?.name || result.user.email?.split('@')[0] || '',
+          pseudo: result.user.user_metadata?.pseudo || '',
+          age: result.user.user_metadata?.age || 18,
+          gender: (result.user.user_metadata?.gender || 'homme') as 'homme' | 'femme',
+          city: result.user.user_metadata?.city || 'Kinshasa',
+          profession: '',
+          religion: '',
+          bio: '',
+          photoUrl: result.user.user_metadata?.avatar_url || '',
+          photoGallery: [],
+          verified: false,
+          interests: [],
+          preferences: { ageMin: 18, ageMax: 50, city: 'Kinshasa', gender: 'tous', religion: '' },
+          createdAt: result.user.created_at || new Date().toISOString(),
+          online: true,
+          lastSeen: new Date().toISOString(),
+        },
+      });
+      // Charger profil complet + données en arrière-plan
+      fetchProfile(result.user.id);
       useKinzolaStore.getState().fetchAllData().catch(console.error);
     }
     return result;

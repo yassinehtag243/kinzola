@@ -72,6 +72,7 @@ export default function AppShell() {
     openChat,
     markConversationRead,
     setPendingNotificationReply,
+    pendingMatchConversationId,
   } = useKinzolaStore();
 
   // Register Service Worker for background notifications
@@ -146,9 +147,9 @@ export default function AppShell() {
   // Surveille pendingMatchConversationId : quand une conversation correspondante
   // apparaît dans le store, ouvre-la automatiquement dans l'onglet messages.
   useEffect(() => {
-    const pendingId = useKinzolaStore.getState().pendingMatchConversationId;
-    if (!pendingId) return;
+    if (!pendingMatchConversationId) return;
 
+    const pendingId = pendingMatchConversationId;
     const store = useKinzolaStore.getState();
     const found = store.conversations.find(c => c.id === pendingId);
     if (found) {
@@ -177,14 +178,13 @@ export default function AppShell() {
             currentChatId: pendingId,
           });
         } else {
-          // Timeout → nettoyer le pending
           useKinzolaStore.setState({ pendingMatchConversationId: null });
         }
       }
     }, 500);
 
     return () => clearInterval(interval);
-  }, [useKinzolaStore.getState().pendingMatchConversationId]);
+  }, [pendingMatchConversationId]);
 
   // Listen for Service Worker messages (notification actions)
   useEffect(() => {
@@ -263,6 +263,17 @@ export default function AppShell() {
           user: null,
           currentScreen: 'welcome',
           currentTab: 'discover',
+        });
+      }
+    } else if (supabaseAuthenticated && !supabaseProfile && !authLoading) {
+      // Session existe mais profil introuvable (erreur réseau, DB...) → forcer logout
+      console.warn('[Auth Sync] Session existe mais profil introuvable');
+      const storeState = useKinzolaStore.getState();
+      if (storeState.isAuthenticated) {
+        useKinzolaStore.setState({
+          isAuthenticated: false,
+          user: null,
+          currentScreen: 'welcome',
         });
       }
     }
