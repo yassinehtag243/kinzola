@@ -141,7 +141,14 @@ export default function MessagesScreen() {
                   } else if (conv) {
                     openChat(conv.id);
                   } else {
-                    openChat(match.id);
+                    // No conversation yet — try loading data first
+                    const state = useKinzolaStore.getState();
+                    state.fetchAllData().then(() => {
+                      const updatedConv = state.conversations.find(c => c.participant.id === match.profile.id);
+                      if (updatedConv) {
+                        openChat(updatedConv.id);
+                      }
+                    }).catch(console.error);
                   }
                 };
                 return (

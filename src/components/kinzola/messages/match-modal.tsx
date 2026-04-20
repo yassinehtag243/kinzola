@@ -55,12 +55,16 @@ export default function MatchModal() {
   const handleClose = () => setShowMatchModal(false, null);
 
   const handleMessage = () => {
+    const { conversations, openChat, setTab } = useKinzolaStore.getState();
     const conv = conversations.find(c => c.participant.id === matchProfile.id);
     if (conv) {
       setTab('messages');
       openChat(conv.id);
     } else {
+      // No conversation yet — switch to messages, fetchAllData will load it
       setTab('messages');
+      // Try to reload conversations
+      useKinzolaStore.getState().fetchAllData().catch(console.error);
     }
     handleClose();
   };

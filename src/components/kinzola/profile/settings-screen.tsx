@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, User, PenTool, Camera, ChevronRight,
@@ -13,7 +13,7 @@ import {
   Loader2, Clock, CheckCircle2, XCircle,
   Volume2, Play, Star as StarFilled, Heart as HeartFilled,
   MessageCircle as MessageFilled, Award as AwardFilled,
-  Download,
+  Download, Users, Plus,
 } from 'lucide-react';
 import { usePwaInstall } from '@/hooks/use-pwa-install';
 import VerifiedBadge, { VerifiedBadgeStatic } from '@/components/kinzola/shared/verified-badge';
@@ -1115,6 +1115,429 @@ function PwaInstallSettingsItem() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// ─── DELETE ACCOUNT MODAL ───
+// ═══════════════════════════════════════════════════════════════
+function DeleteAccountModal({ onClose, onToast }: { onClose: () => void; onToast: (msg: string, type: 'success' | 'error' | 'info') => void }) {
+  const { user } = useKinzolaStore();
+  const isLight = useKinzolaStore((s) => s.theme === 'light');
+
+  const [step, setStep] = useState<'reason' | 'password' | 'confirm'>('reason');
+  const [reason, setReason] = useState('');
+  const [otherReason, setOtherReason] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const reasons = [
+    'Je ne trouve pas de match',
+    'Je reçois trop de notifications',
+    'Je veux supprimer mes données',
+    "J'ai trouvé l'amour",
+    'Autre raison',
+  ];
+
+  const handleReasonNext = () => {
+    if (!reason) return;
+    if (reason === 'Autre raison' && !otherReason.trim()) {
+      setError('Veuillez préciser votre raison');
+      return;
+    }
+    setError('');
+    setStep('password');
+  };
+
+  const handlePasswordNext = async () => {
+    if (!password) {
+      setError('Veuillez entrer votre mot de passe');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    try {
+      const { supabase } = await import('@/lib/supabase/client');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.email) {
+        setError('Session expirée, reconnectez-vous');
+        setLoading(false);
+        return;
+      }
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: session.user.email,
+        password,
+      });
+      if (authError) {
+        setError('Mot de passe incorrect');
+        setLoading(false);
+        return;
+      }
+      setStep('confirm');
+      setLoading(false);
+    } catch {
+      setError('Erreur lors de la vérification');
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const { deleteAccount } = await import('@/lib/supabase/auth-service');
+      const { error } = await deleteAccount(user.id);
+      if (error) {
+        setError(error.message || 'Erreur lors de la suppression');
+        setLoading(false);
+        return;
+      }
+      onToast('Compte supprimé avec succès', 'success');
+      if (typeof window !== 'undefined') {
+        localStorage.clear();
+        window.location.replace('/?t=' + Date.now());
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Erreur lors de la suppression');
+      setLoading(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[70] flex items-end justify-center"
+      style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 30, stiffness: 350 }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-lg rounded-t-3xl p-6 pb-10"
+        style={{
+          background: isLight ? '#FFFFFF' : '#0A1F3C',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+        }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(239, 68, 68, 0.15)' }}>
+              <Trash2 className="w-5 h-5" style={{ color: '#ef4444' }} />
+            </div>
+            <div>
+              <h3 className={`text-lg font-bold ${isLight ? 'text-gray-900' : 'text-white'}`}>Supprimer mon compte</h3>
+              <p className={`text-[11px] ${isLight ? 'text-gray-400' : 'text-kinzola-muted'}`}>
+                {step === 'reason' && 'Étape 1 : Pourquoi partir ?'}
+                {step === 'password' && 'Étape 2 : Vérification'}
+                {step === 'confirm' && 'Étape 3 : Confirmation finale'}
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full glass flex items-center justify-center cursor-pointer">
+            <X className={`w-4 h-4 ${isLight ? 'text-gray-500' : 'text-white/60'}`} />
+          </button>
+        </div>
+
+        {/* Progress steps */}
+        <div className="flex items-center gap-2 mb-6">
+          {['reason', 'password', 'confirm'].map((s, i) => {
+            const steps = ['reason', 'password', 'confirm'];
+            const currentIndex = steps.indexOf(step);
+            const isActive = i <= currentIndex;
+            return (
+              <div key={s} className="flex-1 flex items-center gap-2">
+                <div
+                  className="h-1.5 rounded-full transition-all duration-500"
+                  style={{
+                    background: isActive
+                      ? 'linear-gradient(135deg, #ef4444, #dc2626)'
+                      : isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)',
+                    flex: 1,
+                  }}
+                />
+              </div>
+            );
+          })}
+        </div>
+
+        {/* REASON STEP */}
+        {step === 'reason' && (
+          <div className="space-y-3">
+            <p className={`text-sm ${isLight ? 'text-gray-600' : 'text-white/70'}`}>
+              Nous sommes triste de vous voir partir. Aidez-nous à améliorer Kinzola en nous donnant votre raison.
+            </p>
+            {reasons.map(r => (
+              <button
+                key={r}
+                onClick={() => { setReason(r); setError(''); }}
+                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-left cursor-pointer transition-all duration-200`}
+                style={{
+                  background: reason === r
+                    ? 'rgba(239, 68, 68, 0.1)'
+                    : isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)',
+                  border: reason === r
+                    ? '1.5px solid rgba(239, 68, 68, 0.4)'
+                    : `1px solid ${isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)'}`,
+                }}
+              >
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all`}
+                  style={{
+                    borderColor: reason === r ? '#ef4444' : (isLight ? '#d1d5db' : 'rgba(255,255,255,0.2)'),
+                    background: reason === r ? '#ef4444' : 'transparent',
+                  }}
+                >
+                  {reason === r && <Check className="w-3 h-3 text-white" />}
+                </div>
+                <span className={`text-sm ${reason === r ? 'text-red-400 font-medium' : (isLight ? 'text-gray-700' : 'text-white/80')}`}>
+                  {r}
+                </span>
+              </button>
+            ))}
+
+            {reason === 'Autre raison' && (
+              <input
+                type="text"
+                value={otherReason}
+                onChange={(e) => setOtherReason(e.target.value)}
+                placeholder="Précisez votre raison..."
+                className="w-full h-12 px-4 rounded-xl text-sm outline-none transition-all"
+                style={{
+                  background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(15, 25, 50, 0.6)',
+                  border: error.includes('préciser') ? '1.5px solid rgba(239, 68, 68, 0.6)' : `1px solid ${isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)'}`,
+                  color: isLight ? '#1a1a2e' : '#FFFFFF',
+                }}
+              />
+            )}
+
+            {error && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2 px-4 py-3 rounded-xl" style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                <span className="text-sm text-red-400">{error}</span>
+              </motion.div>
+            )}
+
+            <motion.button whileTap={{ scale: 0.97 }} onClick={handleReasonNext} className="w-full h-12 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2 cursor-pointer transition-all mt-4"
+              style={{ background: 'linear-gradient(135deg, #EF4444, #DC2626)', color: '#FFFFFF', boxShadow: '0 4px 20px rgba(239, 68, 68, 0.3)' }}>
+              Continuer
+            </motion.button>
+          </div>
+        )}
+
+        {/* PASSWORD STEP */}
+        {step === 'password' && (
+          <div className="space-y-4">
+            <p className={`text-sm ${isLight ? 'text-gray-600' : 'text-white/70'}`}>
+              Pour confirmer votre identité, veuillez entrer votre mot de passe.
+            </p>
+            <div>
+              <label className={`text-xs font-medium block mb-1.5 ${isLight ? 'text-gray-500' : 'text-kinzola-muted'}`}>Mot de passe</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Entrez votre mot de passe"
+                  className="w-full h-12 px-4 pr-12 rounded-xl text-sm outline-none transition-all"
+                  style={{
+                    background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(15, 25, 50, 0.6)',
+                    border: error ? '1.5px solid rgba(239, 68, 68, 0.6)' : `1px solid ${isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)'}`,
+                    color: isLight ? '#1a1a2e' : '#FFFFFF',
+                  }}
+                />
+                <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer p-1">
+                  {showPassword ? <EyeOff className="w-4 h-4" style={{ color: isLight ? '#9ca3af' : '#8899B4' }} /> : <Eye className="w-4 h-4" style={{ color: isLight ? '#9ca3af' : '#8899B4' }} />}
+                </button>
+              </div>
+            </div>
+            {error && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2 px-4 py-3 rounded-xl" style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                <span className="text-sm text-red-400">{error}</span>
+              </motion.div>
+            )}
+            <motion.button whileTap={{ scale: 0.97 }} onClick={handlePasswordNext} disabled={loading} className="w-full h-12 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2 cursor-pointer transition-all"
+              style={{ background: loading ? 'rgba(239,68,68,0.3)' : 'linear-gradient(135deg, #EF4444, #DC2626)', color: '#FFFFFF', boxShadow: loading ? 'none' : '0 4px 20px rgba(239, 68, 68, 0.3)' }}>
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+              {loading ? 'Vérification...' : 'Vérifier mon identité'}
+            </motion.button>
+          </div>
+        )}
+
+        {/* CONFIRM STEP */}
+        {step === 'confirm' && (
+          <div className="space-y-5 text-center">
+            <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center" style={{ background: 'rgba(239, 68, 68, 0.1)', border: '2px solid rgba(239, 68, 68, 0.3)' }}>
+              <AlertTriangle className="w-8 h-8 text-red-400" />
+            </div>
+            <div>
+              <h4 className={`text-lg font-bold mb-2 ${isLight ? 'text-gray-900' : 'text-white'}`}>Action irréversible</h4>
+              <p className={`text-sm leading-relaxed ${isLight ? 'text-gray-600' : 'text-white/70'}`}>
+                Cette action est irréversible. Toutes vos données seront supprimées définitivement : profil, messages, matchs, photos et publications.
+              </p>
+            </div>
+            {error && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2 px-4 py-3 rounded-xl" style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                <span className="text-sm text-red-400">{error}</span>
+              </motion.div>
+            )}
+            <motion.button whileTap={{ scale: 0.97 }} onClick={handleDelete} disabled={loading} className="w-full h-12 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2 cursor-pointer transition-all"
+              style={{ background: loading ? 'rgba(239,68,68,0.3)' : 'linear-gradient(135deg, #EF4444, #991B1B)', color: '#FFFFFF', boxShadow: loading ? 'none' : '0 4px 20px rgba(239, 68, 68, 0.4)' }}>
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              {loading ? 'Suppression en cours...' : 'Supprimer définitivement mon compte'}
+            </motion.button>
+            <button onClick={onClose} className="w-full h-12 rounded-2xl font-medium text-sm flex items-center justify-center gap-2 cursor-pointer transition-all"
+              style={{ color: isLight ? '#6b7280' : 'text-white/50' }}>
+              Annuler
+            </button>
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ─── ACCOUNT SWITCHER MODAL ───
+// ═══════════════════════════════════════════════════════════════
+function AccountSwitcherModal({ onClose, onToast, onSwitchAccount }: { onClose: () => void; onToast: (msg: string, type: 'success' | 'error' | 'info') => void; onSwitchAccount: (email: string) => void }) {
+  const { user } = useKinzolaStore();
+  const isLight = useKinzolaStore((s) => s.theme === 'light');
+  const [accounts, setAccounts] = useState<string[]>([]);
+  const [removed, setRemoved] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const saved = JSON.parse(localStorage.getItem('kinzola-known-accounts') || '[]');
+      setAccounts(saved);
+    } catch {}
+  }, []);
+
+  const handleRemoveAccount = (email: string) => {
+    const updated = accounts.filter(a => a !== email);
+    localStorage.setItem('kinzola-known-accounts', JSON.stringify(updated));
+    setAccounts(updated);
+    setRemoved(email);
+    setTimeout(() => setRemoved(null), 2000);
+  };
+
+  const maskEmail = (email: string) => {
+    const [local, domain] = email.split('@');
+    if (local.length <= 2) return email;
+    return local[0] + '***' + local.slice(-1) + '@' + domain;
+  };
+
+  const handleAddAccount = () => {
+    onToast('Déconnexion...', 'info');
+    setTimeout(() => {
+      onClose();
+      // Navigate to login with a flag to add account
+      useKinzolaStore.getState().logout();
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('kinzola-splash-seen');
+        window.location.replace('/?add_account=true&t=' + Date.now());
+      }
+    }, 500);
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[70] flex items-end justify-center"
+      style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+      onClick={onClose}>
+      <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 30, stiffness: 350 }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-lg rounded-t-3xl p-6 pb-10"
+        style={{ background: isLight ? '#FFFFFF' : '#0A1F3C' }}>
+        
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(43, 127, 255, 0.15)' }}>
+              <Users className="w-5 h-5" style={{ color: '#2B7FFF' }} />
+            </div>
+            <div>
+              <h3 className={`text-lg font-bold ${isLight ? 'text-gray-900' : 'text-white'}`}>Autres comptes</h3>
+              <p className={`text-[11px] ${isLight ? 'text-gray-400' : 'text-kinzola-muted'}`}>{accounts.length} compte(s) enregistré(s)</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full glass flex items-center justify-center cursor-pointer">
+            <X className={`w-4 h-4 ${isLight ? 'text-gray-500' : 'text-white/60'}`} />
+          </button>
+        </div>
+
+        {/* Current account */}
+        {user && (
+          <div className="mb-4 p-4 rounded-xl" style={{ background: 'rgba(43, 127, 255, 0.08)', border: '1px solid rgba(43, 127, 255, 0.2)' }}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {user.photoUrl ? (
+                  <img src={user.photoUrl} alt="" className="w-10 h-10 rounded-full object-cover" />
+                ) : (
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #2B7FFF, #FF4D8D)' }}>
+                    <span className="text-white font-bold text-sm">{user.name?.[0]}</span>
+                  </div>
+                )}
+                <div>
+                  <p className={`text-sm font-medium ${isLight ? 'text-gray-900' : 'text-white'}`}>{user.name}</p>
+                  <p className={`text-[11px] ${isLight ? 'text-gray-400' : 'text-kinzola-muted'}`}>{user.email}</p>
+                </div>
+              </div>
+              <span className="text-[10px] px-2 py-1 rounded-full font-medium" style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e' }}>
+                Connecté
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Other accounts */}
+        <div className="space-y-2 mb-4">
+          {accounts.filter(a => a !== user?.email).map(email => (
+            <div key={email} className="flex items-center justify-between p-3.5 rounded-xl transition-all" style={{ background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)', border: `1px solid ${isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)'}` }}>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)' }}>
+                  <User className="w-4 h-4" style={{ color: isLight ? '#9ca3af' : '#8899B4' }} />
+                </div>
+                <div className="min-w-0">
+                  <p className={`text-sm truncate ${isLight ? 'text-gray-700' : 'text-white/80'}`}>{maskEmail(email)}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => onSwitchAccount(email)} className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all" style={{ background: 'linear-gradient(135deg, #2B7FFF, #FF4D8D)', color: '#FFFFFF' }}>
+                  Connecter
+                </button>
+                <button onClick={() => handleRemoveAccount(email)} className="p-1.5 rounded-lg cursor-pointer transition-all" style={{ background: isLight ? 'rgba(239, 68, 68, 0.08)' : 'rgba(239, 68, 68, 0.1)' }}>
+                  <X className="w-3.5 h-3.5 text-red-400" />
+                </button>
+              </div>
+            </div>
+          ))}
+          {accounts.filter(a => a !== user?.email).length === 0 && (
+            <p className={`text-center text-sm py-6 ${isLight ? 'text-gray-400' : 'text-kinzola-muted'}`}>
+              Aucun autre compte enregistré
+            </p>
+          )}
+        </div>
+
+        {/* Add account button */}
+        <motion.button whileTap={{ scale: 0.97 }} onClick={handleAddAccount} className="w-full h-12 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2 cursor-pointer transition-all"
+          style={{ background: 'linear-gradient(135deg, #2B7FFF, #FF4D8D)', color: '#FFFFFF', boxShadow: '0 4px 20px rgba(43, 127, 255, 0.3)' }}>
+          <Plus className="w-4 h-4" />
+          Ajouter un nouveau compte
+        </motion.button>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // ─── MAIN SETTINGS SCREEN ───
 // ═══════════════════════════════════════════════════════════════
 export default function SettingsScreen() {
@@ -1150,6 +1573,8 @@ export default function SettingsScreen() {
   const [showReportProblem, setShowReportProblem] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showAccountSwitcher, setShowAccountSwitcher] = useState(false);
 
   // Toast
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -1183,10 +1608,28 @@ export default function SettingsScreen() {
       setShowTerms(true);
     } else if (label === 'Politique de confidentialité') {
       setShowPrivacy(true);
+    } else if (label === 'Supprimer mon compte') {
+      setShowDeleteModal(true);
     } else {
       alert(`${label} — fonctionnalité à venir`);
     }
   }, []);
+
+  // Handle switch to another account
+  const handleSwitchAccount = useCallback((targetEmail: string) => {
+    showToast(`Connexion à ${targetEmail}...`, 'info');
+    setTimeout(() => {
+      // Store the target email for pre-fill on login screen
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('kinzola-switch-to-account', targetEmail);
+      }
+      useKinzolaStore.getState().logout();
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('kinzola-splash-seen');
+        window.location.replace('/?t=' + Date.now());
+      }
+    }, 500);
+  }, [showToast]);
 
   const handleSaveTextSize = useCallback(() => {
     setTextSize(pendingTextSize);
@@ -1763,6 +2206,21 @@ export default function SettingsScreen() {
           transition={{ delay: 7 * 0.06, duration: 0.4, ease: 'easeOut' as const }}
           className="space-y-3 pb-4"
         >
+          {/* ═══ Autres comptes ═══ */}
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={() => setShowAccountSwitcher(true)}
+            className="w-full h-12 rounded-2xl font-medium text-sm flex items-center justify-center gap-2.5 cursor-pointer transition-all duration-300"
+            style={{
+              background: isLight ? 'rgba(43, 127, 255, 0.08)' : 'rgba(43, 127, 255, 0.1)',
+              border: '1px solid rgba(43, 127, 255, 0.2)',
+              color: '#2B7FFF',
+            }}
+          >
+            <Users className="w-4 h-4" />
+            Autres comptes
+          </motion.button>
+
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={async () => {
@@ -1797,7 +2255,7 @@ export default function SettingsScreen() {
 
           <motion.button
             whileTap={{ scale: 0.97 }}
-            onClick={() => handleSupportAction('Supprimer mon compte')}
+            onClick={() => setShowDeleteModal(true)}
             className="w-full h-12 rounded-2xl font-medium text-sm flex items-center justify-center gap-2.5 cursor-pointer transition-all duration-300 hover:bg-red-500/5"
             style={{
               border: '1px solid rgba(239, 68, 68, 0.3)',
@@ -1812,6 +2270,25 @@ export default function SettingsScreen() {
       </div>
 
       {/* ─── MODALS ─── */}
+      <AnimatePresence>
+        {showDeleteModal && (
+          <DeleteAccountModal
+            onClose={() => setShowDeleteModal(false)}
+            onToast={showToast}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showAccountSwitcher && (
+          <AccountSwitcherModal
+            onClose={() => setShowAccountSwitcher(false)}
+            onToast={showToast}
+            onSwitchAccount={handleSwitchAccount}
+          />
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {showPasswordModal && (
           <PasswordChangeModal

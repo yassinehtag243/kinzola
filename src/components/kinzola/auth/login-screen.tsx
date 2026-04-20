@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Lock, Eye, EyeOff, Phone, Mail, ShieldCheck } from 'lucide-react';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
@@ -28,6 +28,25 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
 
   const [error, setError] = useState('');
+
+  // Pre-fill email from account switcher
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const switchTo = localStorage.getItem('kinzola-switch-to-account');
+      if (switchTo) {
+        localStorage.removeItem('kinzola-switch-to-account');
+        // If it contains @, it's an email; otherwise it's a phone number
+        if (switchTo.includes('@')) {
+          setMethod('email');
+          setEmail(switchTo);
+        } else {
+          setMethod('phone');
+          setPhone(switchTo);
+        }
+      }
+    } catch {}
+  }, []);
 
   // Reset all states when switching method
   const switchMethod = (newMethod: LoginMethod) => {

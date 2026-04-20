@@ -244,6 +244,9 @@ interface KinzolaState {
   mutedConversationIds: string[];
   reports: Array<{ id: string; targetUserId: string; reason: string; createdAt: string }>;
 
+  // Pending match conversation ID (used to open chat after match data loads)
+  pendingMatchConversationId: string | null;
+
   // Notification Reply
   pendingNotificationReply: { conversationId: string; participantName: string } | null;
 
@@ -390,6 +393,7 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
   blockedUserIds: [],
   mutedConversationIds: [],
   reports: [],
+  pendingMatchConversationId: null,
   pendingNotificationReply: null,
   superLikesRemaining: 5,
   totalLikesReceived: 0,
@@ -441,6 +445,18 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
         error: null,
       });
 
+      // Save account to known accounts list
+      if (typeof window !== 'undefined') {
+        try {
+          const savedAccounts = JSON.parse(localStorage.getItem('kinzola-known-accounts') || '[]');
+          const email = isEmail ? identifier : `${identifier.replace(/\D/g, '')}@kinzola.app`;
+          if (!savedAccounts.includes(email)) {
+            savedAccounts.push(email);
+            localStorage.setItem('kinzola-known-accounts', JSON.stringify(savedAccounts));
+          }
+        } catch {}
+      }
+
       // Charger toutes les données en arrière-plan
       get().fetchAllData().catch(console.error);
     } catch (err: any) {
@@ -490,6 +506,17 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
         loading: false,
         error: null,
       });
+
+      // Save account to known accounts list
+      if (typeof window !== 'undefined') {
+        try {
+          const savedAccounts = JSON.parse(localStorage.getItem('kinzola-known-accounts') || '[]');
+          if (!savedAccounts.includes(email)) {
+            savedAccounts.push(email);
+            localStorage.setItem('kinzola-known-accounts', JSON.stringify(savedAccounts));
+          }
+        } catch {}
+      }
 
       // Charger toutes les données en arrière-plan
       get().fetchAllData().catch(console.error);
@@ -673,6 +700,11 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
           showMatchModal: true,
           matchProfile: profile,
         });
+
+        // Store conversation ID so we can open the chat after data loads
+        if (result.conversationId) {
+          set({ pendingMatchConversationId: result.conversationId });
+        }
 
         // Recharger les conversations pour inclure la nouvelle
         get().fetchAllData().catch(console.error);

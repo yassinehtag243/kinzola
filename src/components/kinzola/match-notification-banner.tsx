@@ -63,7 +63,9 @@ export default function MatchNotificationBanner() {
       setTab('messages');
       openChat(conv.id);
     } else {
+      // No conversation yet — switch to messages, fetchAllData will open it
       setTab('messages');
+      useKinzolaStore.getState().fetchAllData().catch(console.error);
     }
     setShowMatchModal(false, null);
     setVisible(false);
