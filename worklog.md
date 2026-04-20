@@ -31,3 +31,22 @@ Stage Summary:
   3. Auto-login → splash-screen skip si déjà vu + Supabase session restore dans app-shell
   4. Persistance du profil → Supabase update + sync Zustand
   5. SW v5 → force cache refresh sur les appareils des utilisateurs
+
+---
+Task ID: 2
+Agent: Main Agent + Full-Stack Developer Sub-agent
+Task: Implement 4 features: match message button, delete account, account switcher
+
+Work Log:
+- Fixed race condition in match → chat navigation (fetchAllData fallback when conversation not yet loaded)
+- Added DeleteAccountModal with 3-step flow: reason selection → password verification → final confirmation
+- Added AccountSwitcherModal showing known accounts from localStorage
+- Modified login/register to save accounts to kinzola-known-accounts in localStorage
+- Added pre-fill email on login when switching accounts (kinzola-switch-to-account)
+- Added "Autres comptes" button before logout in settings
+- Fixed import conflict (User duplicated in lucide-react imports)
+- Build succeeded, pushed to GitHub, SW bumped to v6
+
+Stage Summary:
+- 6 files modified, 546 insertions
+- All 4 features deployed to kinzola.vercel.app
