@@ -128,6 +128,50 @@ export default function AppShell() {
     return () => clearTimeout(timer);
   }, []);
 
+  // ─── Auto-open chat when a match creates a new conversation ───────
+  // Surveille pendingMatchConversationId : quand une conversation correspondante
+  // apparaît dans le store, ouvre-la automatiquement dans l'onglet messages.
+  useEffect(() => {
+    const pendingId = useKinzolaStore.getState().pendingMatchConversationId;
+    if (!pendingId) return;
+
+    const store = useKinzolaStore.getState();
+    const found = store.conversations.find(c => c.id === pendingId);
+    if (found) {
+      // La conversation est chargée → ouvrir le chat
+      useKinzolaStore.setState({
+        pendingMatchConversationId: null,
+        currentTab: 'messages',
+        currentChatId: pendingId,
+      });
+      return;
+    }
+
+    // Pas encore trouvée → vérifier périodiquement (max 10s)
+    let attempts = 0;
+    const maxAttempts = 20;
+    const interval = setInterval(() => {
+      attempts++;
+      const s = useKinzolaStore.getState();
+      const conv = s.conversations.find(c => c.id === pendingId);
+      if (conv || attempts >= maxAttempts) {
+        clearInterval(interval);
+        if (conv) {
+          useKinzolaStore.setState({
+            pendingMatchConversationId: null,
+            currentTab: 'messages',
+            currentChatId: pendingId,
+          });
+        } else {
+          // Timeout → nettoyer le pending
+          useKinzolaStore.setState({ pendingMatchConversationId: null });
+        }
+      }
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, [useKinzolaStore.getState().pendingMatchConversationId]);
+
   // Listen for Service Worker messages (notification actions)
   useEffect(() => {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;

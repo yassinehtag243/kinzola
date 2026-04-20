@@ -237,10 +237,11 @@ export function useRealtime() {
         const exists = store.matches.some((m) => m.id === match.id);
         if (exists) return;
 
-        // Ajouter le nouveau match + recharger les données
+        // Ajouter le nouveau match + afficher le modal avec le profil
         useKinzolaStore.setState({
           matches: [frontendMatch, ...store.matches],
           showMatchModal: true,
+          matchProfile: frontendMatch.profile,
         });
 
         // Recharger les conversations pour inclure la conversation du match

@@ -1183,14 +1183,37 @@ function DeleteAccountModal({ onClose, onToast }: { onClose: () => void; onToast
     if (!user) return;
     setLoading(true);
     try {
-      const { deleteAccount } = await import('@/lib/supabase/auth-service');
-      const { error } = await deleteAccount(user.id);
-      if (error) {
-        setError(error.message || 'Erreur lors de la suppression');
+      // Récupérer le token d'authentification actuel
+      const { supabase } = await import('@/lib/supabase/client');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        setError('Session expirée, reconnectez-vous');
         setLoading(false);
         return;
       }
+
+      // Appeler l'API côté serveur (qui a la clé service_role)
+      const res = await fetch('/api/delete-account', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ userId: user.id }),
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        setError(result.error || 'Erreur lors de la suppression');
+        setLoading(false);
+        return;
+      }
+
+      // Déconnecter localement
+      await supabase.auth.signOut();
       onToast('Compte supprimé avec succès', 'success');
+
       if (typeof window !== 'undefined') {
         localStorage.clear();
         window.location.replace('/?t=' + Date.now());
@@ -1405,7 +1428,7 @@ function DeleteAccountModal({ onClose, onToast }: { onClose: () => void; onToast
 // ═══════════════════════════════════════════════════════════════
 // ─── ACCOUNT SWITCHER MODAL ───
 // ═══════════════════════════════════════════════════════════════
-function AccountSwitcherModal({ onClose, onToast, onSwitchAccount }: { onClose: () => void; onToast: (msg: string, type: 'success' | 'error' | 'info') => void; onSwitchAccount: (email: string) => void }) {
+function AccountSwitcherModal({ onClose, onToast, onSwitchAccount, showLogout = false, onLogout }: { onClose: () => void; onToast: (msg: string, type: 'success' | 'error' | 'info') => void; onSwitchAccount: (email: string) => void; showLogout?: boolean; onLogout?: () => void }) {
   const { user } = useKinzolaStore();
   const isLight = useKinzolaStore((s) => s.theme === 'light');
   const [accounts, setAccounts] = useState<string[]>([]);
@@ -1532,6 +1555,23 @@ function AccountSwitcherModal({ onClose, onToast, onSwitchAccount }: { onClose: 
           <Plus className="w-4 h-4" />
           Ajouter un nouveau compte
         </motion.button>
+
+        {/* Logout button — only visible when opened from the logout button */}
+        {showLogout && onLogout && (
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={onLogout}
+            className="w-full h-12 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2 cursor-pointer transition-all mt-3"
+            style={{
+              background: 'linear-gradient(135deg, #EF4444, #DC2626)',
+              color: '#FFFFFF',
+              boxShadow: '0 4px 20px rgba(239, 68, 68, 0.3)',
+            }}
+          >
+            <LogOut className="w-4 h-4" />
+            Se déconnecter
+          </motion.button>
+        )}
       </motion.div>
     </motion.div>
   );
@@ -1575,6 +1615,7 @@ export default function SettingsScreen() {
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showAccountSwitcher, setShowAccountSwitcher] = useState(false);
+  const [logoutMode, setLogoutMode] = useState(false);
 
   // Toast
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -2209,7 +2250,10 @@ export default function SettingsScreen() {
           {/* ═══ Autres comptes ═══ */}
           <motion.button
             whileTap={{ scale: 0.97 }}
-            onClick={() => setShowAccountSwitcher(true)}
+            onClick={() => {
+              setLogoutMode(false);
+              setShowAccountSwitcher(true);
+            }}
             className="w-full h-12 rounded-2xl font-medium text-sm flex items-center justify-center gap-2.5 cursor-pointer transition-all duration-300"
             style={{
               background: isLight ? 'rgba(43, 127, 255, 0.08)' : 'rgba(43, 127, 255, 0.1)',
@@ -2223,23 +2267,9 @@ export default function SettingsScreen() {
 
           <motion.button
             whileTap={{ scale: 0.97 }}
-            onClick={async () => {
-              try {
-                // D'abord afficher le toast AVANT que le composant ne se démonte
-                showToast('Déconnexion en cours...', 'info');
-                // Petit délai pour laisser le toast s'afficher
-                await new Promise(r => setTimeout(r, 400));
-                await logout();
-                // Forcer un rechargement complet de la page
-                if (typeof window !== 'undefined') {
-                  localStorage.removeItem('kinzola-splash-seen');
-                  // Utiliser replace + timestamp pour contourner le cache du SW
-                  window.location.replace('/?t=' + Date.now());
-                }
-              } catch (err) {
-                showToast('Erreur lors de la déconnexion', 'error');
-                console.error('[Logout] Erreur:', err);
-              }
+            onClick={() => {
+              setLogoutMode(true);
+              setShowAccountSwitcher(true);
             }}
             disabled={false}
             className="w-full h-12 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2.5 cursor-pointer transition-all duration-300 disabled:opacity-50"
@@ -2282,9 +2312,25 @@ export default function SettingsScreen() {
       <AnimatePresence>
         {showAccountSwitcher && (
           <AccountSwitcherModal
-            onClose={() => setShowAccountSwitcher(false)}
+            onClose={() => { setShowAccountSwitcher(false); setLogoutMode(false); }}
             onToast={showToast}
             onSwitchAccount={handleSwitchAccount}
+            showLogout={logoutMode}
+            onLogout={async () => {
+              try {
+                showToast('Déconnexion en cours...', 'info');
+                await new Promise(r => setTimeout(r, 400));
+                setShowAccountSwitcher(false);
+                await logout();
+                if (typeof window !== 'undefined') {
+                  localStorage.removeItem('kinzola-splash-seen');
+                  window.location.replace('/?t=' + Date.now());
+                }
+              } catch (err) {
+                showToast('Erreur lors de la déconnexion', 'error');
+                console.error('[Logout] Erreur:', err);
+              }
+            }}
           />
         )}
       </AnimatePresence>
