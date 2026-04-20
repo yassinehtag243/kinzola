@@ -130,6 +130,18 @@ export async function updateProfilePhoto(
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
+ * Uploader une photo de couverture.
+ * Chemin : profiles/{userId}/cover.jpg
+ */
+export async function uploadCoverPhoto(
+  userId: string,
+  file: File
+): Promise<UploadResult> {
+  const path = `profiles/${userId}/cover.jpg`;
+  return uploadFile(path, file);
+}
+
+/**
  * Uploader une photo de galerie.
  * Chemin : profiles/{userId}/gallery/{index}.jpg
  */

@@ -814,7 +814,11 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
   setShowFilters: (show) => set({ showFilters: show }),
 
   // ─── Messages Actions ───────────────────────────────────────────────
-  openChat: (conversationId) => set({ currentChatId: conversationId }),
+  openChat: (conversationId) => {
+    set({ currentChatId: conversationId });
+    // Marquer les messages comme lus quand on ouvre une conversation
+    get().markConversationRead(conversationId);
+  },
   closeChat: () => set({ currentChatId: null }),
 
   sendMessage: async (conversationId, content) => {

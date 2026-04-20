@@ -36,6 +36,7 @@ export interface Profile {
   id: string;
   userId: string;
   name: string;
+  pseudo: string;
   age: number;
   gender: 'homme' | 'femme';
   city: string;

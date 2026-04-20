@@ -259,7 +259,10 @@ export default function MessagesScreen() {
                   <div className="flex-1 min-w-0 text-left">
                     <div className="flex items-center justify-between mb-0.5">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <h4 className="text-sm font-bold truncate">{customNicknames[conv.id] || conv.participant.name}</h4>
+                        <h4 className="text-sm font-bold truncate">{customNicknames[conv.id] || conv.participant.pseudo || conv.participant.name}</h4>
+                        {!(customNicknames[conv.id]) && conv.participant.name && conv.participant.name !== conv.participant.pseudo && (
+                          <span className="text-[10px] text-kinzola-muted truncate flex-shrink-0">({conv.participant.name})</span>
+                        )}
                         {conv.online && (
                           <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0"
                             style={{ background: 'rgba(74, 222, 128, 0.12)', color: '#4ade80' }}>

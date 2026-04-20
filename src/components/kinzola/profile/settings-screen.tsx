@@ -13,7 +13,7 @@ import {
   Loader2, Clock, CheckCircle2, XCircle,
   Volume2, Play, Star as StarFilled, Heart as HeartFilled,
   MessageCircle as MessageFilled, Award as AwardFilled,
-  Download, Users, Plus,
+  Download, Users, Plus, Image,
 } from 'lucide-react';
 import { usePwaInstall } from '@/hooks/use-pwa-install';
 import VerifiedBadge, { VerifiedBadgeStatic } from '@/components/kinzola/shared/verified-badge';
@@ -1630,9 +1630,72 @@ export default function SettingsScreen() {
     setShowSettings(false);
   }, [setShowEditProfile, setShowSettings]);
 
-  const handleChangePhoto = useCallback(() => {
-    alert('Changer la photo de profil — à venir');
-  }, []);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  const handleChangePhoto = useCallback(async () => {
+    if (!user) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      setUploadingPhoto(true);
+      try {
+        const { updateProfilePhoto } = await import('@/lib/supabase/storage-service');
+        const result = await updateProfilePhoto(user.id, file);
+        if (result.url) {
+          useKinzolaStore.setState(s => ({
+            user: s.user ? { ...s.user, photoUrl: result.url! } : s.user,
+          }));
+          showToast('Photo de profil mise à jour !', 'success');
+        } else {
+          showToast(result.error || 'Erreur lors du téléchargement', 'error');
+        }
+      } catch (err: any) {
+        showToast(err?.message || 'Erreur', 'error');
+      } finally {
+        setUploadingPhoto(false);
+      }
+    };
+    input.click();
+  }, [user, showToast]);
+
+  const handleChangeCoverPhoto = useCallback(async () => {
+    if (!user) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      setUploadingPhoto(true);
+      try {
+        const { uploadCoverPhoto } = await import('@/lib/supabase/storage-service');
+        const result = await uploadCoverPhoto(user.id, file);
+        if (result.url) {
+          // Store cover photo in photo_gallery[0] position
+          const currentGallery = user.photoGallery || [];
+          const updatedGallery = [result.url, ...currentGallery.filter(u => !u.includes('/cover.'))];
+          const { supabase } = await import('@/lib/supabase/client');
+          await (supabase.from('profiles') as any).update({ photo_gallery: updatedGallery }).eq('id', user.id);
+          useKinzolaStore.setState(s => ({
+            user: s.user ? { ...s.user, photoGallery: updatedGallery } : s.user,
+          }));
+          showToast('Photo de couverture ajoutée !', 'success');
+        } else {
+          showToast(result.error || 'Erreur', 'error');
+        }
+      } catch (err: any) {
+        showToast(err?.message || 'Erreur', 'error');
+      } finally {
+        setUploadingPhoto(false);
+      }
+    };
+    input.click();
+  }, [user, showToast]);
 
   const handleSupportAction = useCallback((label: string) => {
     if (label === "Centre d'aide") {
@@ -1750,11 +1813,20 @@ export default function SettingsScreen() {
           <SectionDivider />
           <NavItem
             icon={Camera}
-            label="Changer la photo de profil"
+            label={uploadingPhoto ? "Téléchargement..." : "Changer la photo de profil"}
             description="Mettre à jour votre photo"
             iconBg="rgba(168, 85, 247, 0.15)"
             iconColor="#a855f7"
-            onClick={handleChangePhoto}
+            onClick={uploadingPhoto ? undefined : handleChangePhoto}
+          />
+          <SectionDivider />
+          <NavItem
+            icon={Image as any}
+            label={uploadingPhoto ? "Téléchargement..." : "Photo de couverture"}
+            description="Ajouter une photo de couverture"
+            iconBg="rgba(43, 127, 255, 0.15)"
+            iconColor="#2B7FFF"
+            onClick={uploadingPhoto ? undefined : handleChangeCoverPhoto}
           />
         </SettingsSection>
 

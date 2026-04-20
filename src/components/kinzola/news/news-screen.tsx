@@ -67,6 +67,7 @@ export default function NewsScreen() {
     commentingPostId,
     addComment,
     setCommentingPostId,
+    selectProfile,
   } = useKinzolaStore();
 
   const [viewingStoryIndex, setViewingStoryIndex] = useState<number | null>(null);
@@ -553,8 +554,40 @@ export default function NewsScreen() {
               transition={{ delay: index * 0.05 }}
               className="glass-card overflow-hidden"
             >
-              {/* Author row */}
-              <div className="flex items-center justify-between p-4 pb-2">
+              {/* Author row — clickable to view profile */}
+              <div
+                className="flex items-center justify-between p-4 pb-2 cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Skip if it's the current user's post
+                  if (post.authorId === user?.id) return;
+                  // Search in matches for full profile data
+                  const matchProfile = matches.find(m => m.profile.userId === post.authorId);
+                  if (matchProfile) {
+                    selectProfile(matchProfile.profile);
+                  } else {
+                    // Build a minimal profile from post data
+                    selectProfile({
+                      id: post.authorId,
+                      userId: post.authorId,
+                      name: post.authorName,
+                      pseudo: post.authorName,
+                      age: 0,
+                      gender: 'homme' as const,
+                      city: '',
+                      profession: '',
+                      religion: '',
+                      bio: '',
+                      photoUrl: post.authorPhoto,
+                      photoGallery: [],
+                      verified: false,
+                      interests: [],
+                      online: false,
+                      lastSeen: '',
+                    });
+                  }
+                }}
+              >
                 <div className="flex items-center gap-3">
                   <img
                     src={post.authorPhoto}

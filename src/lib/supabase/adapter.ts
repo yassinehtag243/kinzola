@@ -40,6 +40,7 @@ export function dbProfileToProfile(db: Profile): FProfile {
     id: db.id,
     userId: db.id,
     name: db.name,
+    pseudo: db.pseudo || '',
     age: db.age,
     gender: db.gender,
     city: db.city,
