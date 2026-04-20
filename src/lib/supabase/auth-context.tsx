@@ -150,8 +150,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!result.error && result.user) {
       setUser(result.user);
       setSession(result.session);
-      await fetchProfile(result.user.id);
-      // fetchAllData est géré par l'effet de sync Supabase↔Zustand dans app-shell.tsx
+      // Naviguer immédiatement vers main + charger les données en arrière-plan
+      useKinzolaStore.setState({ isAuthenticated: true, currentScreen: 'main', loading: false, error: null });
+      fetchProfile(result.user.id);  // fire-and-forget — ne bloque pas le retour
+      useKinzolaStore.getState().fetchAllData().catch(console.error);
     }
     return result;
   }, [fetchProfile]);
@@ -162,8 +164,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!result.error && result.user) {
       setUser(result.user);
       setSession(result.session);
-      await fetchProfile(result.user.id);
-      // fetchAllData est géré par l'effet de sync Supabase↔Zustand dans app-shell.tsx
+      useKinzolaStore.setState({ isAuthenticated: true, currentScreen: 'main', loading: false, error: null });
+      fetchProfile(result.user.id);  // fire-and-forget
+      useKinzolaStore.getState().fetchAllData().catch(console.error);
     }
     return result;
   }, [fetchProfile]);

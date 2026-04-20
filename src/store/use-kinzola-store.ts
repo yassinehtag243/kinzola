@@ -405,6 +405,7 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
   badgeRequestTime: null,
   loading: false,
   error: null,
+  _fetchingAll: false,
 
   // ─── Navigation Actions ─────────────────────────────────────────────
   setScreen: (screen) => set((state) => ({ currentScreen: screen, previousScreen: state.currentScreen })),
@@ -559,7 +560,10 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
     const { user, isAuthenticated } = get();
     if (!isAuthenticated || !user) return;
 
-    set({ loading: true });
+    // Éviter les appels dupliqués (login + app-shell sync peuvent tous les deux déclencher)
+    const state = get();
+    if (state._fetchingAll) return;
+    set({ _fetchingAll: true, loading: true });
 
     try {
       // Charger les données en parallèle
@@ -659,10 +663,11 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
         blockedUserIds,
         loading: false,
         error: null,
+        _fetchingAll: false,
       });
     } catch (err: any) {
       console.error('[fetchAllData] Erreur:', err);
-      set({ loading: false, error: err?.message || 'Erreur de chargement des données' });
+      set({ loading: false, error: err?.message || 'Erreur de chargement des données', _fetchingAll: false });
     }
   },
 
