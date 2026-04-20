@@ -10,7 +10,7 @@
 //  Gestion des notifications push avec actions
 // ═══════════════════════════════════════════════════════════════════════════
 
-const CACHE_NAME = 'kinzola-v5';
+const CACHE_NAME = 'kinzola-v6';
 
 // ─── URLs à pré-cacher à l'installation ────────────────────────────────
 const PRECACHE_URLS = [
