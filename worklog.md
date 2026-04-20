@@ -290,3 +290,22 @@ Stage Summary:
 - Auto-login: Supabase session is restored, user goes directly to main screen
 - Logout: clears session, clears splash flag, reloads to welcome screen
 - Build passes: Next.js 16.1.3 build successful
+---
+Task ID: 3
+Agent: main
+Task: Fix profile edit blocked by password requirement + logout robustness
+
+Work Log:
+- Root cause found: isFormValid required password → button was always disabled
+- Root cause: signInWithPassword for password verification could fail (empty email for phone users) and caused race condition with auth state
+- Removed password verification entirely from edit-personal-info.tsx
+- Simplified form: only firstName, lastName, pseudo fields (no password)
+- isFormValid now only checks name fields are non-empty
+- Direct updateProfile call without any pre-verification step
+- Fixed logout: using window.location.replace('/?t=' + timestamp) to bypass SW cache
+
+Stage Summary:
+- Files modified: edit-personal-info.tsx, settings-screen.tsx
+- Profile edit now works without password requirement
+- Save button is active as soon as name fields are filled
+- Build passes

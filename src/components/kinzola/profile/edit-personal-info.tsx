@@ -1,10 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Lock, Check, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { ArrowLeft, Check, AlertTriangle } from 'lucide-react';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
-import { supabase } from '@/lib/supabase/client';
 
 export default function EditPersonalInfo() {
   const { user, updateProfile, setShowEditPersonalInfo } = useKinzolaStore();
@@ -12,13 +11,12 @@ export default function EditPersonalInfo() {
   const [firstName, setFirstName] = useState(user?.name?.split(' ')[0] || '');
   const [lastName, setLastName] = useState(user?.name?.split(' ').slice(1).join(' ') || '');
   const [pseudo, setPseudo] = useState(user?.pseudo || '');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const isFormValid = firstName.trim() && lastName.trim() && pseudo.trim() && password.trim();
+  // Pas besoin de mot de passe pour modifier le nom/pseudo
+  const isFormValid = firstName.trim() && lastName.trim() && pseudo.trim();
 
   const handleSave = async () => {
     if (!isFormValid) return;
@@ -26,41 +24,27 @@ export default function EditPersonalInfo() {
     setIsSaving(true);
 
     try {
-      // 1) Vérifier le mot de passe en se ré-authentifiant
-      const email = user?.email || '';
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password: password.trim(),
-      });
-
-      if (authError) {
-        setError('Mot de passe incorrect. Veuillez réessayer.');
-        setIsSaving(false);
-        return;
-      }
-
-      // 2) Mettre à jour le profil dans Supabase
       const result = await updateProfile({
         name: `${firstName.trim()} ${lastName.trim()}`,
         pseudo: pseudo.trim(),
       });
 
       if (!result.success) {
-        setError(result.error || 'Erreur lors de la sauvegarde dans la base de données.');
+        setError(result.error || 'Erreur lors de la sauvegarde.');
         setIsSaving(false);
         return;
       }
 
-      // 3) Succès
+      // Succès
       setIsSaving(false);
       setShowSuccess(true);
       setTimeout(() => {
         setShowSuccess(false);
         setShowEditPersonalInfo(false);
-      }, 1500);
+      }, 1200);
     } catch (err: any) {
       console.error('[EditPersonalInfo] Erreur:', err);
-      setError(err?.message || 'Une erreur est survenue lors de la sauvegarde.');
+      setError(err?.message || 'Une erreur est survenue.');
       setIsSaving(false);
     }
   };
@@ -74,7 +58,7 @@ export default function EditPersonalInfo() {
       className="fixed inset-0 z-[60] flex flex-col"
       style={{ background: '#0A1F3C' }}
     >
-      {/* Subtle animated background accents */}
+      {/* Animated background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
           className="absolute -top-40 -right-40 w-80 h-80 rounded-full opacity-20 blur-3xl"
@@ -115,7 +99,7 @@ export default function EditPersonalInfo() {
 
       {/* Form Content */}
       <div className="relative z-10 flex-1 overflow-y-auto px-5 pt-6 pb-8 flex flex-col">
-        {/* Title Section */}
+        {/* Title */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -137,7 +121,7 @@ export default function EditPersonalInfo() {
           </p>
         </motion.div>
 
-        {/* Glassmorphism Form Card */}
+        {/* Form Card */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -153,9 +137,8 @@ export default function EditPersonalInfo() {
             boxShadow: '0 8px 40px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.06)',
           }}
         >
-          {/* Form Fields */}
           <div className="space-y-5">
-            {/* Field 1: Prénom */}
+            {/* Prénom */}
             <div>
               <label className="block text-xs font-semibold text-kinzola-muted uppercase tracking-wider mb-2 pl-1">
                 Prénom
@@ -194,7 +177,7 @@ export default function EditPersonalInfo() {
               </div>
             </div>
 
-            {/* Field 2: Nom */}
+            {/* Nom */}
             <div>
               <label className="block text-xs font-semibold text-kinzola-muted uppercase tracking-wider mb-2 pl-1">
                 Nom
@@ -233,7 +216,7 @@ export default function EditPersonalInfo() {
               </div>
             </div>
 
-            {/* Field 3: Pseudo */}
+            {/* Pseudo */}
             <div>
               <label className="block text-xs font-semibold text-kinzola-muted uppercase tracking-wider mb-2 pl-1">
                 Pseudo
@@ -271,57 +254,9 @@ export default function EditPersonalInfo() {
                 )}
               </div>
             </div>
-
-            {/* Field 4: Mot de passe */}
-            <div>
-              <label className="block text-xs font-semibold text-kinzola-muted uppercase tracking-wider mb-2 pl-1">
-                Mot de passe (pour confirmer)
-              </label>
-              <div className="relative">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2">
-                  <Lock className="w-4 h-4 text-kinzola-muted" />
-                </div>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => { setPassword(e.target.value); setError(''); }}
-                  placeholder="Entrez votre mot de passe"
-                  className="w-full h-[52px] rounded-2xl pl-11 pr-11 text-white text-sm outline-none transition-all duration-300"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.04)',
-                    border: error ? '1px solid rgba(239, 68, 68, 0.6)' : password ? '1px solid rgba(255, 77, 141, 0.4)' : '1px solid rgba(255, 255, 255, 0.08)',
-                    boxShadow: error ? '0 0 20px rgba(239, 68, 68, 0.1)' : password ? '0 0 20px rgba(255, 77, 141, 0.1)' : 'none',
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = error ? 'rgba(239, 68, 68, 0.6)' : 'rgba(255, 77, 141, 0.5)';
-                    e.currentTarget.style.boxShadow = error ? '0 0 20px rgba(239, 68, 68, 0.15)' : '0 0 20px rgba(255, 77, 141, 0.15)';
-                  }}
-                  onBlur={(e) => {
-                    if (!password) {
-                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
-                      e.currentTarget.style.boxShadow = 'none';
-                    } else if (!error) {
-                      e.currentTarget.style.borderColor = 'rgba(255, 77, 141, 0.4)';
-                      e.currentTarget.style.boxShadow = '0 0 20px rgba(255, 77, 141, 0.1)';
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer"
-                >
-                  {showPassword ? (
-                    <EyeOff className="w-4 h-4 text-kinzola-muted" />
-                  ) : (
-                    <Eye className="w-4 h-4 text-kinzola-muted" />
-                  )}
-                </button>
-              </div>
-            </div>
           </div>
 
-          {/* Error message */}
+          {/* Error */}
           {error && (
             <motion.div
               initial={{ opacity: 0, y: -5 }}
@@ -334,7 +269,7 @@ export default function EditPersonalInfo() {
             </motion.div>
           )}
 
-          {/* Sauvegarder Button */}
+          {/* Save Button */}
           <motion.button
             onClick={handleSave}
             disabled={!isFormValid || isSaving}
@@ -345,9 +280,7 @@ export default function EditPersonalInfo() {
               background: isFormValid
                 ? 'linear-gradient(135deg, #FF4D8D 0%, #FF6BA0 40%, #2B7FFF 100%)'
                 : 'rgba(255, 255, 255, 0.06)',
-              border: isFormValid
-                ? 'none'
-                : '1px solid rgba(255, 255, 255, 0.08)',
+              border: isFormValid ? 'none' : '1px solid rgba(255, 255, 255, 0.08)',
               boxShadow: isFormValid
                 ? '0 8px 32px rgba(255, 77, 141, 0.4), 0 4px 16px rgba(43, 127, 255, 0.3)'
                 : 'none',
@@ -366,9 +299,8 @@ export default function EditPersonalInfo() {
             )}
           </motion.button>
 
-          {/* Hint text */}
           <p className="text-[11px] text-kinzola-muted/60 text-center mt-4 leading-relaxed">
-            Votre mot de passe est requis pour confirmer toute modification.
+            Vos modifications seront visibles immédiatement sur votre profil.
           </p>
         </motion.div>
       </div>
@@ -376,7 +308,6 @@ export default function EditPersonalInfo() {
   );
 }
 
-/** Tiny chevron-right icon (inline breadcrumb) */
 function ChevronRightIcon() {
   return (
     <svg

@@ -1772,10 +1772,11 @@ export default function SettingsScreen() {
                 // Petit délai pour laisser le toast s'afficher
                 await new Promise(r => setTimeout(r, 400));
                 await logout();
-                // Forcer la réinitialisation complète
+                // Forcer un rechargement complet de la page
                 if (typeof window !== 'undefined') {
                   localStorage.removeItem('kinzola-splash-seen');
-                  window.location.href = '/';
+                  // Utiliser replace + timestamp pour contourner le cache du SW
+                  window.location.replace('/?t=' + Date.now());
                 }
               } catch (err) {
                 showToast('Erreur lors de la déconnexion', 'error');
