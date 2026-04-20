@@ -128,35 +128,17 @@ export default function AppShell() {
     return () => clearTimeout(timer);
   }, []);
 
-  // ─── Handle URL params : add_account, switch-to-account ────────────
+  // ─── Handle URL params : switch-to-account ─────────────────────────
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
 
-    // Ajouter un nouveau compte → aller directement sur Login
-    if (params.get('add_account') === 'true') {
-      // Attendre que le logout + splash + auth soient terminés
-      const timer = setTimeout(() => {
-        const state = useKinzolaStore.getState();
-        if (!state.isAuthenticated) {
-          useKinzolaStore.setState({ currentScreen: 'login' });
-          window.history.replaceState({}, '', window.location.pathname);
-        }
-      }, 3000); // 3s pour laisser le logout + splash se terminer
-      return () => clearTimeout(timer);
-    }
-
     // Switcher vers un compte spécifique → pré-remplir le login
     const switchTo = params.get('switch_to');
     if (switchTo) {
-      const timer = setTimeout(() => {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('kinzola-switch-to-account', switchTo);
-        }
-        useKinzolaStore.setState({ currentScreen: 'login' });
-        window.history.replaceState({}, '', window.location.pathname);
-      }, 3000);
-      return () => clearTimeout(timer);
+      localStorage.setItem('kinzola-switch-to-account', switchTo);
+      useKinzolaStore.setState({ currentScreen: 'login' });
+      window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
 

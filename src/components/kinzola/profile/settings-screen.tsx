@@ -1457,16 +1457,10 @@ function AccountSwitcherModal({ onClose, onToast, onSwitchAccount, showLogout = 
   };
 
   const handleAddAccount = () => {
-    onToast('Déconnexion...', 'info');
-    setTimeout(() => {
-      onClose();
-      // Navigate to login with a flag to add account
-      useKinzolaStore.getState().logout();
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('kinzola-splash-seen');
-        window.location.replace('/?add_account=true&t=' + Date.now());
-      }
-    }, 500);
+    onClose();
+    // Navigation simple vers la page de connexion sans détruire la session actuelle
+    // Le login remplacera naturellement la session Supabase par le nouveau compte
+    useKinzolaStore.setState({ currentScreen: 'login' });
   };
 
   return (
@@ -1658,18 +1652,12 @@ export default function SettingsScreen() {
 
   // Handle switch to another account
   const handleSwitchAccount = useCallback((targetEmail: string) => {
-    showToast(`Connexion à ${targetEmail}...`, 'info');
-    setTimeout(() => {
-      // Store the target email for pre-fill on login screen
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('kinzola-switch-to-account', targetEmail);
-      }
-      useKinzolaStore.getState().logout();
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('kinzola-splash-seen');
-        window.location.replace('/?t=' + Date.now());
-      }
-    }, 500);
+    // Pré-remplir l'email pour le login sans détruire la session actuelle
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('kinzola-switch-to-account', targetEmail);
+    }
+    useKinzolaStore.setState({ currentScreen: 'login' });
+    showToast(`Connectez-vous à ${targetEmail}`, 'info');
   }, [showToast]);
 
   const handleSaveTextSize = useCallback(() => {

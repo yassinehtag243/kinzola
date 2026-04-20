@@ -128,12 +128,14 @@ export async function login(email: string, password: string): Promise<AuthResult
     return { user: null, session: null, error };
   }
 
-  // Update online status
+  // Update online status (non-bloquant — ne bloque pas le retour du login)
   if (data.user) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase.from('profiles') as any)
+    (supabase.from('profiles') as any)
       .update({ online: true, last_seen: new Date().toISOString() })
-      .eq('id', data.user.id);
+      .eq('id', data.user.id)
+      .then(() => {})
+      .catch(() => {});
   }
 
   return {

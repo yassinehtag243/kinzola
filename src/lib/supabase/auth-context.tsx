@@ -151,8 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(result.user);
       setSession(result.session);
       await fetchProfile(result.user.id);
-      // Synchroniser le store Zustand avec les données Supabase
-      useKinzolaStore.getState().fetchAllData().catch(console.error);
+      // fetchAllData est géré par l'effet de sync Supabase↔Zustand dans app-shell.tsx
     }
     return result;
   }, [fetchProfile]);
@@ -164,8 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(result.user);
       setSession(result.session);
       await fetchProfile(result.user.id);
-      // Synchroniser le store Zustand avec les données Supabase
-      useKinzolaStore.getState().fetchAllData().catch(console.error);
+      // fetchAllData est géré par l'effet de sync Supabase↔Zustand dans app-shell.tsx
     }
     return result;
   }, [fetchProfile]);
