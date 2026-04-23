@@ -1506,6 +1506,7 @@ function AccountSwitcherModal({ onClose, onToast, onSwitchAccount, showLogout = 
     // Nettoyer les données de l'utilisateur courant avant de naviguer vers login
     useKinzolaStore.setState({
       currentScreen: 'login',
+      showSettings: false,
       conversations: [],
       matches: [],
       messages: [],
@@ -1635,6 +1636,7 @@ export default function SettingsScreen() {
     logout, theme, setTheme,
     textSize, setTextSize,
     badgeStatus,
+    user,
   } = useKinzolaStore();
 
   const isLight = theme === 'light';
@@ -1776,6 +1778,7 @@ export default function SettingsScreen() {
     }
     useKinzolaStore.setState({
       currentScreen: 'login',
+      showSettings: false,
       conversations: [],
       matches: [],
       messages: [],
