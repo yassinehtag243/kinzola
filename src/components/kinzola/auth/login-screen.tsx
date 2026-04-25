@@ -81,7 +81,13 @@ export default function LoginScreen() {
       // Generate a unique email from the phone number for Supabase auth
       const cleanPhone = phone.replace(/[\s\-\+\(\)]/g, '');
       const generatedEmail = `${cleanPhone}@kinzola.app`;
-      const result = await supabaseLogin(generatedEmail, password);
+
+      // Safety timeout: if login doesn't resolve in 20s, stop the spinner
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Délai dépassé. Vérifiez votre connexion et réessayez.')), 20000)
+      );
+
+      const result = await Promise.race([supabaseLogin(generatedEmail, password), timeoutPromise]);
       if (result.error) {
         setError(result.error.message === 'Invalid login credentials'
           ? 'Numéro ou mot de passe incorrect'
@@ -116,7 +122,12 @@ export default function LoginScreen() {
     }
     setEmailLoggingIn(true);
     try {
-      const result = await supabaseLogin(email, password);
+      // Safety timeout: if login doesn't resolve in 20s, stop the spinner
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Délai dépassé. Vérifiez votre connexion et réessayez.')), 20000)
+      );
+
+      const result = await Promise.race([supabaseLogin(email, password), timeoutPromise]);
       if (result.error) {
         setError(result.error.message === 'Invalid login credentials'
           ? 'E-mail ou mot de passe incorrect'

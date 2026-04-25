@@ -564,6 +564,15 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
     if (state._fetchingAll) return;
     set({ _fetchingAll: true, loading: true });
 
+    // Safety timeout: reset _fetchingAll after 30s so it never gets stuck
+    const safetyTimer = setTimeout(() => {
+      const s = get();
+      if (s._fetchingAll) {
+        console.warn('[fetchAllData] Safety timeout — resetting _fetchingAll');
+        set({ _fetchingAll: false, loading: false });
+      }
+    }, 30000);
+
     try {
       // Charger les données en parallèle
       const [
@@ -653,6 +662,7 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
         ? sortProfilesByCompatibility(user, profiles)
         : profiles;
 
+      clearTimeout(safetyTimer);
       set({
         profiles: sortedProfiles,
         matches,
@@ -665,6 +675,7 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
         _fetchingAll: false,
       });
     } catch (err: any) {
+      clearTimeout(safetyTimer);
       console.error('[fetchAllData] Erreur:', err);
       set({ loading: false, error: err?.message || 'Erreur de chargement des données', _fetchingAll: false });
     }

@@ -265,21 +265,14 @@ export default function AppShell() {
           currentTab: 'discover',
         });
       }
-    } else if (supabaseAuthenticated && !supabaseProfile && !authLoading) {
-      // Session existe mais profil pas encore chargé
-      // Ne PAS forcer le logout immédiatement — le login handler a pu définir
-      // l'utilisateur dans Zustand avant que le profil ne soit chargé ici.
-      // On force le logout SEULEMENT si Zustand non plus n'a pas d'utilisateur.
-      const storeState = useKinzolaStore.getState();
-      if (!storeState.isAuthenticated || !storeState.user) {
-        console.warn('[Auth Sync] Session existe mais profil introuvable et Zustand pas connecté');
-        useKinzolaStore.setState({
-          isAuthenticated: false,
-          user: null,
-          currentScreen: 'welcome',
-        });
-      }
     }
+    // REMOVED: The third branch (supabaseAuthenticated && !supabaseProfile && !authLoading)
+    // that used to force logout was causing a RACE CONDITION during login:
+    // - login() succeeds → Supabase fires SIGNED_IN → session exists but profile hasn't loaded yet
+    // - This branch fires BEFORE profile loads → RESETS Zustand to welcome screen
+    // - User gets kicked back to welcome while login() is still processing
+    // Now the profile loads in the background via onAuthStateChange(SIGNED_IN),
+    // and the first branch (supabaseAuthenticated && supabaseProfile) handles the sync.
   }, [supabaseAuthenticated, supabaseProfile, authLoading]);
 
   // ✅ Hydration-safe mounted pattern

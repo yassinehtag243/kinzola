@@ -16,7 +16,7 @@ import React, {
   useMemo,
   type ReactNode,
 } from 'react';
-import type { User, Session } from '@supabase/supabase-js';
+import type { User, Session, AuthError } from '@supabase/supabase-js';
 import type { Profile } from '@/lib/supabase/database.types';
 import { supabase } from '@/lib/supabase/client';
 import { useKinzolaStore } from '@/store/use-kinzola-store';
@@ -145,21 +145,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchProfile]);
 
   // ── Action: login ──
+  // CRITICAL: This function must return QUICKLY. Do NOT await getUser() here.
+  // The profile is loaded in the background by onAuthStateChange (SIGNED_IN) + app-shell sync.
+  // Awaiting getUser() here causes the LoginScreen spinner to spin forever if the
+  // profile fetch is slow or fails.
   const login = useCallback(async (email: string, password: string): Promise<AuthResult> => {
-    const result = await loginUser(email, password);
-    if (!result.error && result.user) {
-      // Charger le profil SYNCHRONEMENT avant de naviguer
-      // Sinon app-shell voit supabaseProfile=null et force logout
-      const profileResult = await getUser();
+    // Add timeout to prevent infinite hanging on Supabase signInWithPassword
+    const LOGIN_TIMEOUT_MS = 15000;
+    const timeoutPromise = new Promise<AuthResult>((_, reject) =>
+      setTimeout(() => reject(new Error('Délai de connexion dépassé. Vérifiez votre connexion internet.')), LOGIN_TIMEOUT_MS)
+    );
 
+    let result: AuthResult;
+    try {
+      result = await Promise.race([loginUser(email, password), timeoutPromise]);
+    } catch (err: any) {
+      return { user: null, session: null, error: { name: 'Timeout', message: err.message, status: 408 } as AuthError };
+    }
+
+    if (!result.error && result.user) {
+      // Set basic auth state IMMEDIATELY — don't wait for profile
       setUser(result.user);
       setSession(result.session);
-      if (profileResult.profile) {
-        setProfile(profileResult.profile);
-      }
 
-      // Naviguer vers main avec les infos du profil si disponible
-      const dbProfile = profileResult.profile;
+      // Navigate to main IMMEDIATELY with basic user data from login result
+      const meta = result.user.user_metadata || {};
       useKinzolaStore.setState({
         isAuthenticated: true,
         currentScreen: 'main',
@@ -168,26 +178,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user: {
           id: result.user.id,
           email: result.user.email || '',
-          phone: dbProfile?.phone || '',
-          name: dbProfile?.name || result.user.user_metadata?.name || result.user.email?.split('@')[0] || '',
-          pseudo: dbProfile?.pseudo || result.user.user_metadata?.pseudo || '',
-          age: dbProfile?.age || result.user.user_metadata?.age || 18,
-          gender: (dbProfile?.gender || result.user.user_metadata?.gender || 'homme') as 'homme' | 'femme',
-          city: dbProfile?.city || result.user.user_metadata?.city || 'Kinshasa',
-          profession: dbProfile?.profession || '',
-          religion: dbProfile?.religion || '',
-          bio: dbProfile?.bio || '',
-          photoUrl: dbProfile?.photo_url || result.user.user_metadata?.avatar_url || '',
-          photoGallery: (dbProfile?.photo_gallery as string[]) || [],
-          verified: dbProfile?.verified ?? false,
-          interests: (dbProfile?.interests as string[]) || [],
+          phone: '',
+          name: meta.name || result.user.email?.split('@')[0] || '',
+          pseudo: meta.pseudo || '',
+          age: meta.age || 18,
+          gender: (meta.gender || 'homme') as 'homme' | 'femme',
+          city: meta.city || 'Kinshasa',
+          profession: '',
+          religion: '',
+          bio: '',
+          photoUrl: meta.avatar_url || '',
+          photoGallery: [],
+          verified: false,
+          interests: [],
           preferences: { ageMin: 18, ageMax: 50, city: 'Kinshasa', gender: 'tous', religion: '' },
-          createdAt: dbProfile?.created_at || result.user.created_at || new Date().toISOString(),
+          createdAt: result.user.created_at || new Date().toISOString(),
           online: true,
           lastSeen: new Date().toISOString(),
         },
       });
-      // Charger toutes les données en arrière-plan
+
+      // Fetch full profile in background — NON-BLOCKING
+      // The onAuthStateChange(SIGNED_IN) handler also fetches the profile.
+      // Whichever completes first sets the profile. The app-shell sync
+      // will then update Zustand with the full profile data.
+      getUser().then((profileResult) => {
+        if (profileResult.profile) {
+          setProfile(profileResult.profile);
+        }
+      }).catch(() => {});
+
+      // Fetch all app data in background — NON-BLOCKING
       useKinzolaStore.getState().fetchAllData().catch(console.error);
     }
     return result;
@@ -197,15 +218,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = useCallback(async (data: RegisterData): Promise<AuthResult> => {
     const result = await registerUser(data);
     if (!result.error && result.user) {
-      // Charger le profil SYNCHRONEMENT avant de naviguer
-      const profileResult = await getUser();
-
+      // Set basic auth state IMMEDIATELY — don't wait for profile
       setUser(result.user);
       setSession(result.session);
-      if (profileResult.profile) {
-        setProfile(profileResult.profile);
-      }
-      useKinzolaStore.setState({ isAuthenticated: true, currentScreen: 'main', loading: false, error: null });
+
+      // Navigate to main immediately
+      const meta = result.user.user_metadata || {};
+      useKinzolaStore.setState({
+        isAuthenticated: true,
+        currentScreen: 'main',
+        loading: false,
+        error: null,
+        user: {
+          id: result.user.id,
+          email: result.user.email || '',
+          phone: '',
+          name: data.name || meta.name || result.user.email?.split('@')[0] || '',
+          pseudo: data.pseudo || meta.pseudo || '',
+          age: data.age || meta.age || 18,
+          gender: (data.gender || meta.gender || 'homme') as 'homme' | 'femme',
+          city: data.city || meta.city || 'Kinshasa',
+          profession: data.profession || '',
+          religion: data.religion || '',
+          bio: data.bio || '',
+          photoUrl: meta.avatar_url || '',
+          photoGallery: [],
+          verified: false,
+          interests: [],
+          preferences: { ageMin: 18, ageMax: 50, city: 'Kinshasa', gender: 'tous', religion: '' },
+          createdAt: result.user.created_at || new Date().toISOString(),
+          online: true,
+          lastSeen: new Date().toISOString(),
+        },
+      });
+
+      // Fetch full profile in background — NON-BLOCKING
+      getUser().then((profileResult) => {
+        if (profileResult.profile) {
+          setProfile(profileResult.profile);
+        }
+      }).catch(() => {});
+
+      // Fetch all app data in background
       useKinzolaStore.getState().fetchAllData().catch(console.error);
     }
     return result;
