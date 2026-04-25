@@ -37,3 +37,28 @@ Stage Summary:
 - 2 bugs corrigés, push sur main
 - Paramètres fonctionne à nouveau
 - "Ajouter un compte" affiche correctement le login
+---
+Task ID: 1
+Agent: Super Z (Main)
+Task: Fix login infinite spinner + Ajouter un compte session conflicts
+
+Work Log:
+- Analysé le rapport utilisateur: "ça tourne sans arrêt ça se connecte pas" (spinner infini au login)
+- Lu auth-context.tsx, app-shell.tsx, login-screen.tsx, auth-service.ts, use-kinzola-store.ts
+- Identifié ROOT CAUSE: race condition critique entre auth-context et app-shell
+  - auth-context login() naviguait vers 'main' AVANT que le profil soit chargé (fire-and-forget fetchProfile)
+  - app-shell détectait supabaseProfile=null et forçait un logout immédiat
+  - Résultat: login → main → welcome (boucle)
+- Fix 1: auth-context.tsx login() — charger le profil SYNCHRONEMENT (await) avant de naviguer
+- Fix 2: app-shell.tsx — ne plus forcer logout si Zustand a déjà un user (login handler a déjà configuré l'état)
+- Fix 3: Reset _fetchingAll=false dans les logout handlers (auth-context + store)
+- Fix 4: handleAddAccount — déconnecter Supabase + reset isAuthenticated avant login
+- Fix 5: handleSwitchAccount — même fix: logout + reset state
+- Build vérifié: compilation réussie
+- Push: commit 5ff0346 + ff051b0
+
+Stage Summary:
+- Bug critique de connexion corrigé: race condition résolue
+- _fetchingAll ne reste plus bloqué après un logout
+- "Ajouter un compte" et "Switch account" ne causent plus de conflits de session
+- 4 fichiers modifiés sur 2 commits, poussés sur main
