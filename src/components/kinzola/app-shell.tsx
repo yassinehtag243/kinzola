@@ -266,10 +266,13 @@ export default function AppShell() {
         });
       }
     } else if (supabaseAuthenticated && !supabaseProfile && !authLoading) {
-      // Session existe mais profil introuvable (erreur réseau, DB...) → forcer logout
-      console.warn('[Auth Sync] Session existe mais profil introuvable');
+      // Session existe mais profil pas encore chargé
+      // Ne PAS forcer le logout immédiatement — le login handler a pu définir
+      // l'utilisateur dans Zustand avant que le profil ne soit chargé ici.
+      // On force le logout SEULEMENT si Zustand non plus n'a pas d'utilisateur.
       const storeState = useKinzolaStore.getState();
-      if (storeState.isAuthenticated) {
+      if (!storeState.isAuthenticated || !storeState.user) {
+        console.warn('[Auth Sync] Session existe mais profil introuvable et Zustand pas connecté');
         useKinzolaStore.setState({
           isAuthenticated: false,
           user: null,

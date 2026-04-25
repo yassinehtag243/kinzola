@@ -550,6 +550,7 @@ export const useKinzolaStore = create<KinzolaState>((set, get) => ({
       showSettings: false,
       showEditPersonalInfo: false,
       showEditProfile: false,
+      _fetchingAll: false,
     });
   },
 

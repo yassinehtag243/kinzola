@@ -148,10 +148,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string): Promise<AuthResult> => {
     const result = await loginUser(email, password);
     if (!result.error && result.user) {
+      // Charger le profil SYNCHRONEMENT avant de naviguer
+      // Sinon app-shell voit supabaseProfile=null et force logout
+      const profileResult = await getUser();
+
       setUser(result.user);
       setSession(result.session);
-      // Naviguer immédiatement vers main avec les infos basiques du user
-      // Le profil complet sera remplacé par fetchProfile + app-shell sync
+      if (profileResult.profile) {
+        setProfile(profileResult.profile);
+      }
+
+      // Naviguer vers main avec les infos du profil si disponible
+      const dbProfile = profileResult.profile;
       useKinzolaStore.setState({
         isAuthenticated: true,
         currentScreen: 'main',
@@ -160,44 +168,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user: {
           id: result.user.id,
           email: result.user.email || '',
-          phone: '',
-          name: result.user.user_metadata?.name || result.user.email?.split('@')[0] || '',
-          pseudo: result.user.user_metadata?.pseudo || '',
-          age: result.user.user_metadata?.age || 18,
-          gender: (result.user.user_metadata?.gender || 'homme') as 'homme' | 'femme',
-          city: result.user.user_metadata?.city || 'Kinshasa',
-          profession: '',
-          religion: '',
-          bio: '',
-          photoUrl: result.user.user_metadata?.avatar_url || '',
-          photoGallery: [],
-          verified: false,
-          interests: [],
+          phone: dbProfile?.phone || '',
+          name: dbProfile?.name || result.user.user_metadata?.name || result.user.email?.split('@')[0] || '',
+          pseudo: dbProfile?.pseudo || result.user.user_metadata?.pseudo || '',
+          age: dbProfile?.age || result.user.user_metadata?.age || 18,
+          gender: (dbProfile?.gender || result.user.user_metadata?.gender || 'homme') as 'homme' | 'femme',
+          city: dbProfile?.city || result.user.user_metadata?.city || 'Kinshasa',
+          profession: dbProfile?.profession || '',
+          religion: dbProfile?.religion || '',
+          bio: dbProfile?.bio || '',
+          photoUrl: dbProfile?.photo_url || result.user.user_metadata?.avatar_url || '',
+          photoGallery: (dbProfile?.photo_gallery as string[]) || [],
+          verified: dbProfile?.verified ?? false,
+          interests: (dbProfile?.interests as string[]) || [],
           preferences: { ageMin: 18, ageMax: 50, city: 'Kinshasa', gender: 'tous', religion: '' },
-          createdAt: result.user.created_at || new Date().toISOString(),
+          createdAt: dbProfile?.created_at || result.user.created_at || new Date().toISOString(),
           online: true,
           lastSeen: new Date().toISOString(),
         },
       });
-      // Charger profil complet + données en arrière-plan
-      fetchProfile(result.user.id);
+      // Charger toutes les données en arrière-plan
       useKinzolaStore.getState().fetchAllData().catch(console.error);
     }
     return result;
-  }, [fetchProfile]);
+  }, []);
 
   // ── Action: register ──
   const register = useCallback(async (data: RegisterData): Promise<AuthResult> => {
     const result = await registerUser(data);
     if (!result.error && result.user) {
+      // Charger le profil SYNCHRONEMENT avant de naviguer
+      const profileResult = await getUser();
+
       setUser(result.user);
       setSession(result.session);
+      if (profileResult.profile) {
+        setProfile(profileResult.profile);
+      }
       useKinzolaStore.setState({ isAuthenticated: true, currentScreen: 'main', loading: false, error: null });
-      fetchProfile(result.user.id);  // fire-and-forget
       useKinzolaStore.getState().fetchAllData().catch(console.error);
     }
     return result;
-  }, [fetchProfile]);
+  }, []);
 
   // ── Action: logout ──
   const logout = useCallback(async () => {
@@ -224,6 +236,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       showSettings: false,
       showEditPersonalInfo: false,
       showEditProfile: false,
+      _fetchingAll: false,
+      loading: false,
     });
     // Supprimer le flag splash pour que l'écran d'accueil se montre au prochain lancement
     if (typeof window !== 'undefined') {
