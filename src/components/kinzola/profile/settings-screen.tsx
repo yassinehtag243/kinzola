@@ -1501,10 +1501,18 @@ function AccountSwitcherModal({ onClose, onToast, onSwitchAccount, showLogout = 
     return local[0] + '***' + local.slice(-1) + '@' + domain;
   };
 
-  const handleAddAccount = () => {
+  const handleAddAccount = async () => {
     onClose();
+    // Déconnecter d'abord la session Supabase pour éviter les conflits
+    // quand l'utilisateur se connectera avec un nouveau compte
+    try {
+      const { supabase } = await import('@/lib/supabase/client');
+      await supabase.auth.signOut();
+    } catch { /* non-bloquant */ }
     // Nettoyer les données de l'utilisateur courant avant de naviguer vers login
     useKinzolaStore.setState({
+      isAuthenticated: false,
+      user: null,
       currentScreen: 'login',
       showSettings: false,
       conversations: [],
@@ -1771,12 +1779,19 @@ export default function SettingsScreen() {
   }, []);
 
   // Handle switch to another account
-  const handleSwitchAccount = useCallback((targetEmail: string) => {
+  const handleSwitchAccount = useCallback(async (targetEmail: string) => {
+    // Déconnecter d'abord pour éviter les conflits de session
+    try {
+      const { supabase } = await import('@/lib/supabase/client');
+      await supabase.auth.signOut();
+    } catch { /* non-bloquant */ }
     // Pré-remplir l'email pour le login + nettoyer les données
     if (typeof window !== 'undefined') {
       localStorage.setItem('kinzola-switch-to-account', targetEmail);
     }
     useKinzolaStore.setState({
+      isAuthenticated: false,
+      user: null,
       currentScreen: 'login',
       showSettings: false,
       conversations: [],
