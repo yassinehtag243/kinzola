@@ -46,7 +46,7 @@ export default function MessagesScreen() {
     return (
       displayN.toLowerCase().includes(searchQuery.toLowerCase()) ||
       c.participant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.lastMessage.toLowerCase().includes(searchQuery.toLowerCase())
+      (c.lastMessage?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
     );
   });
 
@@ -203,7 +203,7 @@ export default function MessagesScreen() {
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleConversationClick(conv.id); }}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer"
+                  className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors cursor-pointer ${isLight ? 'hover:bg-black/[0.04]' : 'hover:bg-white/5'}`}
                 >
                   {/* Avatar with online dot + story ring — separate click handler */}
                   <div
@@ -234,7 +234,7 @@ export default function MessagesScreen() {
                         src={conv.participant.photoUrl}
                         alt={conv.participant.name}
                         className="w-[52px] h-[52px] rounded-full object-cover"
-                        style={{ border: conv.online ? '2px solid rgba(74, 222, 128, 0.4)' : '2px solid rgba(255,255,255,0.08)' }}
+                        style={{ border: conv.online ? '2px solid rgba(74, 222, 128, 0.4)' : isLight ? '2px solid rgba(0,0,0,0.08)' : '2px solid rgba(255,255,255,0.08)' }}
                       />
                     )}
                     {conv.online ? (
@@ -329,19 +329,19 @@ export default function MessagesScreen() {
                         useKinzolaStore.getState().blockUser(conv.participant.userId);
                         setMenuConvId(null);
                       }}
-                      className="w-full flex items-center gap-2 px-4 py-3 text-sm text-orange-400 hover:bg-white/5 transition-colors cursor-pointer"
+                      className={`w-full flex items-center gap-2 px-4 py-3 text-sm text-orange-400 transition-colors cursor-pointer ${isLight ? 'hover:bg-black/[0.04]' : 'hover:bg-white/5'}`}
                     >
                       <Ban className="w-4 h-4" />
                       Bloquer
                     </button>
-                    <div className="h-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
+                    <div className="h-px" style={{ background: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)' }} />
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         deleteConversation(conv.id);
                         setMenuConvId(null);
                       }}
-                      className="w-full flex items-center gap-2 px-4 py-3 text-sm text-red-400 hover:bg-white/5 transition-colors cursor-pointer"
+                      className={`w-full flex items-center gap-2 px-4 py-3 text-sm text-red-400 transition-colors cursor-pointer ${isLight ? 'hover:bg-black/[0.04]' : 'hover:bg-white/5'}`}
                     >
                       <Trash2 className="w-4 h-4" />
                       Supprimer

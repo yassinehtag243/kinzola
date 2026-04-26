@@ -38,7 +38,7 @@ function useCountUp(target: number, duration = 1200) {
 }
 
 // ─── Bio component with expand/collapse ───
-function BioSection({ bio }: { bio: string }) {
+function BioSection({ bio, isLight }: { bio: string; isLight: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const [needsCollapse, setNeedsCollapse] = useState(false);
   const textRef = useRef<HTMLParagraphElement>(null);
@@ -64,7 +64,7 @@ function BioSection({ bio }: { bio: string }) {
             animate={{ height: expanded ? 'auto' : 72 }}
             transition={{ duration: 0.3, ease: 'easeInOut' as const }}
             className="text-sm leading-relaxed overflow-hidden"
-            style={{ color: 'rgba(255,255,255,0.75)' }}
+            style={{ color: isLight ? 'rgba(26,26,46,0.75)' : 'rgba(255,255,255,0.75)' }}
           >
             {bio}
           </motion.p>
@@ -169,12 +169,14 @@ function ProfileListModal({
   icon: Icon,
   color,
   onClose,
+  isLight,
 }: {
   title: string;
   profiles: Profile[];
   icon: typeof Heart;
   color: string;
   onClose: () => void;
+  isLight: boolean;
 }) {
   return (
     <motion.div
@@ -184,7 +186,7 @@ function ProfileListModal({
       className="fixed inset-0 z-[60]"
     >
       {/* Backdrop */}
-      <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }} onClick={onClose} />
+      <div className="absolute inset-0" style={{ background: isLight ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }} onClick={onClose} />
 
       {/* Panel */}
       <motion.div
@@ -194,24 +196,26 @@ function ProfileListModal({
         transition={{ type: 'spring', damping: 28, stiffness: 350 }}
         className="absolute bottom-0 left-0 right-0 max-h-[80vh] rounded-t-3xl overflow-hidden"
         style={{
-          background: 'linear-gradient(165deg, rgba(20, 25, 40, 0.98), rgba(10, 14, 26, 0.98))',
-          boxShadow: '0 -10px 50px rgba(0,0,0,0.5)',
-          border: '1px solid rgba(255,255,255,0.06)',
+          background: isLight
+            ? 'linear-gradient(165deg, rgba(255, 255, 255, 0.98), rgba(245, 247, 250, 0.98))'
+            : 'linear-gradient(165deg, rgba(20, 25, 40, 0.98), rgba(10, 14, 26, 0.98))',
+          boxShadow: isLight ? '0 -10px 50px rgba(0,0,0,0.1)' : '0 -10px 50px rgba(0,0,0,0.5)',
+          border: isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.06)',
         }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.06)' }}>
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: color + '20', color }}>
               <Icon className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white">{title}</h3>
+              <h3 className="text-base font-bold" style={{ color: isLight ? '#111' : '#fff' }}>{title}</h3>
               <p className="text-[10px] text-kinzola-muted">{profiles.length} personne{profiles.length > 1 ? 's' : ''}</p>
             </div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors">
-            <X className="w-4 h-4 text-white/70" />
+          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center transition-colors" style={isLight ? {} : {}}>
+            <X className={`w-4 h-4 ${isLight ? 'text-gray-400' : 'text-white/70'}`} />
           </button>
         </div>
 
@@ -223,22 +227,22 @@ function ProfileListModal({
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.03 }}
-              className="flex items-center gap-3 p-3 rounded-xl transition-colors hover:bg-white/5"
+              className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${isLight ? 'hover:bg-black/[0.04]' : 'hover:bg-white/5'}`}
             >
               <div className="relative flex-shrink-0">
                 <img
                   src={profile.photoUrl}
                   alt={profile.name}
                   className="w-12 h-12 rounded-full object-cover"
-                  style={{ border: '2px solid rgba(255,255,255,0.1)' }}
+                  style={{ border: isLight ? '2px solid rgba(0,0,0,0.08)' : '2px solid rgba(255,255,255,0.1)' }}
                 />
                 {profile.online && (
-                  <div className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-green-500" style={{ border: '2px solid #0A0E1A' }} />
+                  <div className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-green-500" style={{ border: isLight ? '2px solid #f5f7fa' : '2px solid #0A0E1A' }} />
                 )}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <p className="text-sm font-semibold text-white truncate">{profile.name}</p>
+                  <p className="text-sm font-semibold truncate" style={{ color: isLight ? '#111' : '#fff' }}>{profile.name}</p>
                   {profile.verified && <VerifiedBadgeStatic />}
                   <span className="text-xs text-kinzola-muted">{profile.age}</span>
                 </div>
@@ -265,7 +269,8 @@ const itemVariants = {
 };
 
 export default function ProfileScreen() {
-  const { user, matches, totalLikesReceived, totalViews, likesReceived, profileVisitors, updateProfile, setShowEditProfile, setShowSettings } = useKinzolaStore();
+  const { user, matches, totalLikesReceived, totalViews, likesReceived, profileVisitors, updateProfile, setShowEditProfile, setShowSettings, theme } = useKinzolaStore();
+  const isLight = theme === 'light';
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [activeModal, setActiveModal] = useState<'matches' | 'likes' | 'views' | null>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -460,7 +465,7 @@ export default function ProfileScreen() {
               </div>
               <div className="min-w-0">
                 <p className="text-[9px] text-kinzola-muted uppercase tracking-wider">Je cherche</p>
-                <p className="text-xs font-semibold truncate" style={{ color: 'rgba(255,255,255,0.9)' }}>{user.lookingFor}</p>
+                <p className="text-xs font-semibold truncate" style={{ color: isLight ? 'rgba(17,17,17,0.9)' : 'rgba(255,255,255,0.9)' }}>{user.lookingFor}</p>
               </div>
             </div>
           )}
@@ -471,7 +476,7 @@ export default function ProfileScreen() {
               </div>
               <div className="min-w-0">
                 <p className="text-[9px] text-kinzola-muted uppercase tracking-wider">Taille</p>
-                <p className="text-xs font-semibold" style={{ color: 'rgba(255,255,255,0.9)' }}>{user.height} cm</p>
+                <p className="text-xs font-semibold" style={{ color: isLight ? 'rgba(17,17,17,0.9)' : 'rgba(255,255,255,0.9)' }}>{user.height} cm</p>
               </div>
             </div>
           )}
@@ -482,7 +487,7 @@ export default function ProfileScreen() {
               </div>
               <div className="min-w-0">
                 <p className="text-[9px] text-kinzola-muted uppercase tracking-wider">Études</p>
-                <p className="text-xs font-semibold truncate" style={{ color: 'rgba(255,255,255,0.9)' }}>{user.education}</p>
+                <p className="text-xs font-semibold truncate" style={{ color: isLight ? 'rgba(17,17,17,0.9)' : 'rgba(255,255,255,0.9)' }}>{user.education}</p>
               </div>
             </div>
           )}
@@ -493,7 +498,7 @@ export default function ProfileScreen() {
               </div>
               <div className="min-w-0">
                 <p className="text-[9px] text-kinzola-muted uppercase tracking-wider">Langues</p>
-                <p className="text-xs font-semibold truncate" style={{ color: 'rgba(255,255,255,0.9)' }}>{user.languages.join(', ')}</p>
+                <p className="text-xs font-semibold truncate" style={{ color: isLight ? 'rgba(17,17,17,0.9)' : 'rgba(255,255,255,0.9)' }}>{user.languages.join(', ')}</p>
               </div>
             </div>
           )}
@@ -504,7 +509,7 @@ export default function ProfileScreen() {
               </div>
               <div className="min-w-0">
                 <p className="text-[9px] text-kinzola-muted uppercase tracking-wider">Téléphone</p>
-                <p className="text-xs font-semibold truncate" style={{ color: 'rgba(255,255,255,0.9)' }}>{user.phone}</p>
+                <p className="text-xs font-semibold truncate" style={{ color: isLight ? 'rgba(17,17,17,0.9)' : 'rgba(255,255,255,0.9)' }}>{user.phone}</p>
               </div>
             </div>
           )}
@@ -515,7 +520,7 @@ export default function ProfileScreen() {
               </div>
               <div className="min-w-0">
                 <p className="text-[9px] text-kinzola-muted uppercase tracking-wider">Email</p>
-                <p className="text-xs font-semibold truncate" style={{ color: 'rgba(255,255,255,0.9)' }}>{user.email}</p>
+                <p className="text-xs font-semibold truncate" style={{ color: isLight ? 'rgba(17,17,17,0.9)' : 'rgba(255,255,255,0.9)' }}>{user.email}</p>
               </div>
             </div>
           )}
@@ -526,7 +531,7 @@ export default function ProfileScreen() {
               </div>
               <div className="min-w-0">
                 <p className="text-[9px] text-kinzola-muted uppercase tracking-wider">Situation</p>
-                <p className="text-xs font-semibold truncate" style={{ color: 'rgba(255,255,255,0.9)' }}>{user.relationshipStatus}</p>
+                <p className="text-xs font-semibold truncate" style={{ color: isLight ? 'rgba(17,17,17,0.9)' : 'rgba(255,255,255,0.9)' }}>{user.relationshipStatus}</p>
               </div>
             </div>
           )}
@@ -537,7 +542,7 @@ export default function ProfileScreen() {
               </div>
               <div className="min-w-0">
                 <p className="text-[9px] text-kinzola-muted uppercase tracking-wider">Style de vie</p>
-                <p className="text-xs font-semibold truncate" style={{ color: 'rgba(255,255,255,0.9)' }}>{user.lifestyle}</p>
+                <p className="text-xs font-semibold truncate" style={{ color: isLight ? 'rgba(17,17,17,0.9)' : 'rgba(255,255,255,0.9)' }}>{user.lifestyle}</p>
               </div>
             </div>
           )}
@@ -554,7 +559,7 @@ export default function ProfileScreen() {
           transition={{ delay: 0.25 }}
           className="px-5 mt-4"
         >
-          <BioSection bio={user.bio} />
+          <BioSection bio={user.bio} isLight={isLight} />
         </motion.div>
       )}
 
@@ -644,8 +649,8 @@ export default function ProfileScreen() {
                 onClick={handleAddPhoto}
                 className="aspect-square rounded-xl flex flex-col items-center justify-center gap-1.5 cursor-pointer"
                 style={{
-                  border: '2px dashed rgba(255,255,255,0.15)',
-                  background: 'rgba(255,255,255,0.03)',
+                  border: isLight ? '2px dashed rgba(0,0,0,0.15)' : '2px dashed rgba(255,255,255,0.15)',
+                  background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)',
                 }}
               >
                 <Plus className="w-6 h-6 text-kinzola-muted" />
@@ -684,8 +689,8 @@ export default function ProfileScreen() {
                 className="glass px-3 py-1.5 rounded-full text-xs font-medium"
                 style={{
                   background: 'linear-gradient(135deg, rgba(43, 127, 255, 0.12), rgba(255, 77, 141, 0.12))',
-                  border: '1px solid rgba(255,255,255,0.06)',
-                  color: '#8899B4',
+                  border: isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.06)',
+                  color: isLight ? '#4B5563' : '#8899B4',
                 }}
               >
                 {interest}
@@ -723,7 +728,7 @@ export default function ProfileScreen() {
           <motion.button
             whileTap={{ scale: 0.9 }}
             onClick={() => setShowSettings(true)}
-            className="w-12 h-12 rounded-full glass flex items-center justify-center cursor-pointer flex-shrink-0 transition-all hover:bg-white/10"
+            className={`w-12 h-12 rounded-full glass flex items-center justify-center cursor-pointer flex-shrink-0 transition-all ${isLight ? 'hover:bg-black/[0.06]' : 'hover:bg-white/10'}`}
           >
             <Settings className="w-5 h-5 text-kinzola-muted" />
           </motion.button>
@@ -750,6 +755,7 @@ export default function ProfileScreen() {
             icon={Heart}
             color="#FF4D8D"
             onClose={() => setActiveModal(null)}
+            isLight={isLight}
           />
         )}
         {activeModal === 'likes' && (
@@ -759,6 +765,7 @@ export default function ProfileScreen() {
             icon={Heart}
             color="#2B7FFF"
             onClose={() => setActiveModal(null)}
+            isLight={isLight}
           />
         )}
         {activeModal === 'views' && (
@@ -768,6 +775,7 @@ export default function ProfileScreen() {
             icon={Eye}
             color="#4ade80"
             onClose={() => setActiveModal(null)}
+            isLight={isLight}
           />
         )}
       </AnimatePresence>
